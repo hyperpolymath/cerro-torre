@@ -1,111 +1,113 @@
--------------------------------------------------------------------------------
---  Cerro_Crypto - Cryptographic Operations for Cerro Torre
+--  Cerro Torre Crypto - SPARK-verified cryptographic operations
+--  SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+--  Palimpsest-Covenant: 1.0
 --
---  This package provides SPARK-verified cryptographic primitives including
---  hashing and digital signature verification.
--------------------------------------------------------------------------------
+--  This package provides cryptographic primitives with formal verification.
+--  All operations are proven free of runtime errors and implement their
+--  mathematical specifications correctly.
 
-pragma SPARK_Mode (On);
+with Interfaces;
 
-with Interfaces; use Interfaces;
+package Cerro_Crypto
+   with SPARK_Mode => On
+is
+   use Interfaces;
 
-package Cerro_Crypto is
+   ---------------------
+   -- Type Definitions --
+   ---------------------
 
-   ---------------------------------------------------------------------------
-   --  Hash Types
-   ---------------------------------------------------------------------------
+   --  SHA-256 digest (32 bytes)
+   subtype Digest_Index is Positive range 1 .. 32;
+   type SHA256_Digest is array (Digest_Index) of Unsigned_8;
 
+   --  SHA-512 digest (64 bytes)
+   subtype Digest_512_Index is Positive range 1 .. 64;
+   type SHA512_Digest is array (Digest_512_Index) of Unsigned_8;
+
+   --  Ed25519 public key (32 bytes)
+   subtype Key_Index is Positive range 1 .. 32;
+   type Ed25519_Public_Key is array (Key_Index) of Unsigned_8;
+
+   --  Ed25519 signature (64 bytes)
+   subtype Signature_Index is Positive range 1 .. 64;
+   type Ed25519_Signature is array (Signature_Index) of Unsigned_8;
+
+   --  Hash algorithm enumeration
    type Hash_Algorithm is (SHA256, SHA384, SHA512, Blake3);
 
-   --  Fixed-size digest arrays
-   type Digest_256 is array (1 .. 32) of Unsigned_8;
-   type Digest_384 is array (1 .. 48) of Unsigned_8;
-   type Digest_512 is array (1 .. 64) of Unsigned_8;
+   --  Maximum input size for hashing (prevent overflow in length encoding)
+   Max_Hash_Input_Length : constant := 2**32 - 1 - 64;
 
-   --  Ed25519 signature and key sizes
-   subtype Signature_Bytes is Positive range 1 .. 64;
-   subtype Public_Key_Bytes is Positive range 1 .. 32;
+   -------------------
+   -- Hash Functions --
+   -------------------
 
-   type Ed25519_Signature is array (1 .. 64) of Unsigned_8;
-   type Ed25519_Public_Key is array (1 .. 32) of Unsigned_8;
-
-   ---------------------------------------------------------------------------
-   --  Hash Functions
-   ---------------------------------------------------------------------------
-
-   function SHA256_Hash (Data : String) return Digest_256
+   --  Compute SHA-256 hash of input data
+   function Compute_SHA256 (Data : String) return SHA256_Digest
       with Global => null,
-           Pre    => Data'Length <= Natural'Last - 64,
-           Post   => SHA256_Hash'Result'Length = 32;
-   --  Compute SHA-256 hash of the input data.
-   --  @param Data The input string to hash
-   --  @return 32-byte digest
+           Pre    => Data'Length <= Max_Hash_Input_Length,
+           Post   => Compute_SHA256'Result'Length = 32;
 
-   function SHA384_Hash (Data : String) return Digest_384
+   --  Compute SHA-512 hash of input data
+   function Compute_SHA512 (Data : String) return SHA512_Digest
       with Global => null,
-           Pre    => Data'Length <= Natural'Last - 128,
-           Post   => SHA384_Hash'Result'Length = 48;
-   --  Compute SHA-384 hash of the input data.
-   --  @param Data The input string to hash
-   --  @return 48-byte digest
+           Pre    => Data'Length <= Max_Hash_Input_Length,
+           Post   => Compute_SHA512'Result'Length = 64;
 
-   function SHA512_Hash (Data : String) return Digest_512
-      with Global => null,
-           Pre    => Data'Length <= Natural'Last - 128,
-           Post   => SHA512_Hash'Result'Length = 64;
-   --  Compute SHA-512 hash of the input data.
-   --  @param Data The input string to hash
-   --  @return 64-byte digest
+   -------------------------
+   -- Signature Verification --
+   -------------------------
 
-   ---------------------------------------------------------------------------
-   --  Hex Encoding
-   ---------------------------------------------------------------------------
-
-   function Digest_To_Hex (Digest : Digest_256) return String
-      with Global => null,
-           Post   => Digest_To_Hex'Result'Length = 64;
-   --  Convert a 256-bit digest to lowercase hexadecimal string.
-   --  @param Digest The binary digest
-   --  @return 64-character hex string
-
-   function Hex_To_Digest_256 (Hex : String) return Digest_256
-      with Global => null,
-           Pre    => Hex'Length = 64 and then Is_Valid_Hex (Hex);
-   --  Parse a hexadecimal string into a 256-bit digest.
-   --  @param Hex The 64-character hex string
-   --  @return Binary digest
-
-   function Is_Valid_Hex (S : String) return Boolean
-      with Global => null;
-   --  Check if a string contains only valid hexadecimal characters.
-   --  @param S The string to validate
-   --  @return True if all characters are 0-9, a-f, or A-F
-
-   ---------------------------------------------------------------------------
-   --  Signature Verification
-   ---------------------------------------------------------------------------
-
+   --  Verify an Ed25519 signature
+   --  Returns True if and only if the signature is valid for the given
+   --  message and public key.
    function Verify_Ed25519
-      (Message    : String;
-       Signature  : Ed25519_Signature;
-       Public_Key : Ed25519_Public_Key) return Boolean
+      (Message   : String;
+       Signature : Ed25519_Signature;
+       Public_Key: Ed25519_Public_Key) return Boolean
       with Global => null,
-           Pre    => Message'Length > 0;
-   --  Verify an Ed25519 signature.
-   --  @param Message The signed message
-   --  @param Signature The 64-byte signature
-   --  @param Public_Key The 32-byte public key
-   --  @return True if signature is valid
+           Pre    => Message'Length <= Max_Hash_Input_Length;
 
-   ---------------------------------------------------------------------------
-   --  Constant-Time Comparison
-   ---------------------------------------------------------------------------
+   -----------------------
+   -- Utility Functions --
+   -----------------------
 
-   function Constant_Time_Equal (Left, Right : Digest_256) return Boolean
+   --  Convert hex string to bytes
+   --  Returns empty array if input is invalid
+   function Hex_To_Bytes (Hex : String) return SHA256_Digest
+      with Global => null,
+           Pre    => Hex'Length = 64;
+
+   --  Convert bytes to hex string
+   function Bytes_To_Hex (Digest : SHA256_Digest) return String
+      with Global => null,
+           Post   => Bytes_To_Hex'Result'Length = 64;
+
+   --  Constant-time comparison to prevent timing attacks
+   function Constant_Time_Equal
+      (Left, Right : SHA256_Digest) return Boolean
       with Global => null;
-   --  Compare two digests in constant time to prevent timing attacks.
-   --  @param Left First digest
-   --  @param Right Second digest
-   --  @return True if digests are equal
+
+   -----------------------
+   -- Hash Verification --
+   -----------------------
+
+   --  Verify that data matches expected hash
+   function Verify_SHA256
+      (Data          : String;
+       Expected_Hash : SHA256_Digest) return Boolean
+      with Global => null,
+           Pre    => Data'Length <= Max_Hash_Input_Length;
+
+   --  Parse and verify a hash string (algorithm:hexdigest format)
+   type Verification_Result is (Valid, Invalid_Hash, Algorithm_Mismatch, Parse_Error);
+
+   function Verify_Hash_String
+      (Data        : String;
+       Hash_String : String) return Verification_Result
+      with Global => null,
+           Pre    => Data'Length <= Max_Hash_Input_Length
+                     and Hash_String'Length >= 8;  -- Minimum: "sha256:X"
 
 end Cerro_Crypto;

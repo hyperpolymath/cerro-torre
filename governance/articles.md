@@ -1,246 +1,262 @@
-# Articles of Association — Cerro Torre Cooperative
+# Cerro Torre Cooperative: Articles of Governance
 
-**Version:** 0.1.0 (Draft)
-**Status:** Pre-formation discussion document
+**Version**: Draft 0.1  
+**Status**: Pre-formation working document
 
-## Preamble
+## 1. Name and Purpose
 
-Cerro Torre is organized as a democratic cooperative to ensure that the project remains accountable to its users and contributors, rather than to venture capital or corporate interests.
+### 1.1 Name
 
-The name "Cerro Torre" invokes a mountain in Patagonia known for both its beauty and the controversy over its first ascent—a reminder that how we reach our goals matters as much as reaching them.
+The organisation shall be known as the **Cerro Torre Cooperative** (the "Cooperative").
 
-## Article I: Purpose
+### 1.2 Purpose
 
-### Section 1.1: Mission
+The Cooperative exists to:
 
-The Cerro Torre Cooperative exists to:
+1. Develop and maintain the Cerro Torre Linux distribution and associated tooling
+2. Provide supply-chain-verified container images to the public
+3. Advance the state of formally verified systems software
+4. Demonstrate that democratic governance of critical infrastructure is viable
+5. Operate transparently and accountably to its members and the public
 
-1. Develop and maintain a supply-chain-verified Linux distribution
-2. Provide complete cryptographic provenance for all distributed software
-3. Ensure the long-term availability of secure, trustworthy container images
-4. Operate transparently and accountably to users and the broader community
+### 1.3 Non-Profit Character
 
-### Section 1.2: Non-Profit Operation
+The Cooperative is not operated for private profit. Any surplus shall be reinvested in the Cooperative's mission or distributed to members in proportion to their participation, never to outside investors.
 
-The Cooperative operates on a not-for-profit basis. Any surplus funds shall be reinvested in the project or distributed to members as patronage dividends proportional to contribution.
+## 2. Membership
 
-### Section 1.3: Open Source Commitment
-
-All software produced by the Cooperative shall be released under OSI-approved open source licenses. Documentation shall be released under Creative Commons Attribution-ShareAlike (CC BY-SA) or similar licenses.
-
-## Article II: Membership
-
-### Section 2.1: Member Classes
+### 2.1 Membership Classes
 
 The Cooperative has three classes of members:
 
-1. **Contributor Members**: Individuals who have made sustained contributions to the project (code, documentation, support, governance)
-2. **User Members**: Organizations or individuals who use Cerro Torre in production and contribute financially
-3. **Affiliate Members**: Allied projects and organizations with observer status
+**Maintainer Members**: Individuals who actively contribute to package maintenance, infrastructure, documentation, or governance. Maintainer members have voting rights on all matters.
 
-### Section 2.2: Admission
+**User Members**: Organisations or individuals who use Cerro Torre in production and choose to support the Cooperative financially. User members have voting rights on strategic matters but not on technical decisions about specific packages.
 
-New Contributor Members are admitted by:
-1. Making at least three accepted contributions over at least two months
-2. Agreeing to the Palimpsest Covenant
-3. Receiving approval from a majority of existing Contributor Members
+**Worker Members**: Individuals employed by the Cooperative (if any). Worker members have voting rights equivalent to Maintainer Members, plus specific rights regarding employment conditions.
 
-New User Members are admitted by:
-1. Demonstrating production use of Cerro Torre
-2. Contributing financially at a level determined by the Board
-3. Agreeing to the Palimpsest Covenant
+### 2.2 Admission
 
-### Section 2.3: Rights
+**Maintainer Members** are admitted by:
+1. Making sustained contributions over at least 3 months, AND
+2. Affirming the Palimpsest Covenant, AND  
+3. Receiving approval from a majority of existing Maintainer Members
 
-All members have the right to:
-- Attend and speak at all General Meetings
-- Access all non-confidential project records
-- Propose resolutions for vote
+**User Members** are admitted by:
+1. Paying the applicable membership fee (sliding scale based on organisation size), AND
+2. Affirming the Palimpsest Covenant
 
-Contributor Members additionally have:
-- One vote per member on all Contributor matters
-- Eligibility to serve on the Board
-- Access to all project infrastructure
+**Worker Members** are admitted automatically upon employment by the Cooperative.
 
-User Members additionally have:
-- Advisory votes on roadmap priorities
-- Input on stability and compatibility policies
+### 2.3 Resignation and Removal
 
-### Section 2.4: Responsibilities
+Members may resign at any time by written notice.
 
-All members are expected to:
-- Uphold the Palimpsest Covenant
-- Participate constructively in governance
-- Disclose conflicts of interest
-
-### Section 2.5: Removal
-
-A member may be removed for:
-- Sustained violation of the Palimpsest Covenant
-- Acting against the interests of the Cooperative
-- Extended inactivity (over two years without participation)
+Members may be removed for:
+1. Sustained violation of the Palimpsest Covenant
+2. Actions that materially harm the Cooperative or its mission
+3. Inactivity exceeding 24 months (Maintainer Members only)
 
 Removal requires:
-- Notice of proposed removal with specific reasons
-- 30-day opportunity to respond
-- Two-thirds vote of the Board
+- A formal complaint submitted to the Governance Committee
+- An opportunity for the member to respond
+- A 2/3 supermajority vote of the relevant membership class
 
-## Article III: Governance Structure
+### 2.4 No Transferability
 
-### Section 3.1: General Meeting
+Membership is personal and may not be sold, assigned, or transferred.
 
-The General Meeting is the highest authority of the Cooperative.
+## 3. Governance Structure
 
-- **Annual General Meeting (AGM)**: Held once per year to elect the Board, approve the annual report, and vote on major policy changes
-- **Special General Meetings**: May be called by the Board or by petition of 20% of Contributor Members
-- **Quorum**: 25% of Contributor Members, or 10 members, whichever is greater
+### 3.1 General Assembly
 
-### Section 3.2: Board of Directors
+The **General Assembly** is the highest decision-making body, comprising all members. It meets at least annually (remotely or in person) and may be convened by:
+- The Coordinating Council
+- A petition signed by 10% of members
 
-The Board manages the Cooperative between General Meetings.
+The General Assembly:
+- Elects the Coordinating Council
+- Amends these Articles
+- Approves strategic plans
+- Decides dissolution or merger
+- Resolves disputes not resolved at lower levels
 
-- **Composition**: 5-9 directors elected by Contributor Members
-- **Terms**: Two years, staggered so roughly half are elected each year
-- **Term Limits**: No more than three consecutive terms
-- **Removal**: By two-thirds vote of the General Meeting
+### 3.2 Coordinating Council
 
-### Section 3.3: Board Responsibilities
+The **Coordinating Council** manages the Cooperative's affairs between General Assemblies. It comprises 5-9 members elected by the General Assembly for 2-year staggered terms.
 
-The Board is responsible for:
-- Strategic direction and policy
-- Budget approval and financial oversight
-- Hiring and supervision of any paid staff
-- Enforcement of the Palimpsest Covenant
-- Appointment of Working Group chairs
+The Council must include:
+- At least 3 Maintainer Members
+- At least 1 User Member (if any exist)
+- At least 1 Worker Member (if any exist)
 
-### Section 3.4: Officers
+The Council:
+- Sets operational policy
+- Manages finances
+- Represents the Cooperative externally
+- Appoints committees
+- Hires staff (subject to budget approval)
 
-The Board elects from among its members:
-- **Chair**: Presides over meetings, serves as spokesperson
-- **Secretary**: Maintains records, manages communications
-- **Treasurer**: Oversees finances and reporting
+Council decisions require a simple majority. No member may serve more than three consecutive terms.
 
-### Section 3.5: Working Groups
+### 3.3 Technical Committee
 
-Working Groups handle specific areas of work:
+The **Technical Committee** has authority over technical matters, including:
+- Package acceptance and removal
+- Tooling architecture decisions
+- Security policy
+- Release management
 
-- **Technical Council**: Architecture decisions, release management
-- **Security Team**: Vulnerability response, audit coordination
-- **Infrastructure Team**: Build systems, repository hosting
-- **Community Team**: Outreach, documentation, support
+Technical Committee members are Maintainer Members elected by Maintainer Members for 2-year terms. The committee operates by consensus where possible; disputed matters require 2/3 majority.
 
-Each Working Group has a chair appointed by the Board and operates according to a charter approved by the Board.
+### 3.4 Governance Committee
 
-## Article IV: Decision Making
+The **Governance Committee** handles:
+- Membership disputes
+- Code of conduct enforcement
+- Covenant interpretation
+- Election administration
 
-### Section 4.1: Consensus Preference
+Governance Committee members are elected by the General Assembly and may not simultaneously serve on the Coordinating Council.
 
-The Cooperative prefers consensus decision-making. Formal votes are reserved for:
-- Elections
-- Disputes that cannot be resolved through discussion
-- Changes to governing documents
-- Member admission and removal
+## 4. Decision-Making
 
-### Section 4.2: Voting Thresholds
+### 4.1 Principles
 
-| Decision Type | Threshold |
-|---------------|-----------|
-| Ordinary decisions | Simple majority (>50%) |
-| Policy changes | Two-thirds majority |
-| Governing document amendments | Three-quarters majority |
-| Dissolution | Nine-tenths majority |
+Decisions should be made at the lowest appropriate level:
+- Individual maintainers decide about their packages
+- The Technical Committee decides cross-cutting technical matters
+- The Coordinating Council decides operational matters
+- The General Assembly decides strategic and constitutional matters
 
-### Section 4.3: Voting Procedures
+### 4.2 Voting
 
-- All votes shall be recorded
-- Electronic voting is permitted with appropriate verification
-- Proxy voting is not permitted
-- Abstentions count toward quorum but not toward the decision threshold
+**Ordinary decisions**: Simple majority of those voting, with a quorum of 25% of eligible voters.
 
-## Article V: Finances
+**Significant decisions** (budget over £10,000, policy changes, new membership classes): 2/3 majority with 40% quorum.
 
-### Section 5.1: Funding Sources
+**Constitutional decisions** (amending Articles, dissolution, merger): 3/4 majority with 50% quorum.
 
-The Cooperative may receive funds from:
-- User Member contributions
-- Grants from foundations
-- Donations from individuals and organizations
-- Paid support and consulting services
+All votes shall be conducted transparently. Secret ballots may be used for elections and personnel matters.
 
-### Section 5.2: Prohibited Funding
+### 4.3 Consensus Preference
 
-The Cooperative shall not accept funding:
-- With strings attached that compromise the mission
-- From organizations that demonstrably act against user interests
-- That would give any party undue influence
+Before calling a vote, decision-makers should attempt to reach consensus through discussion. Votes are a fallback for when consensus cannot be achieved, not the default.
 
-### Section 5.3: Financial Transparency
+### 4.4 Documentation
 
-- Annual financial reports shall be published
-- All expenditures over $500 shall be itemized
-- Board members' compensation (if any) shall be disclosed
+All decisions shall be documented in a public decision log, including:
+- What was decided
+- Who participated
+- The reasoning
+- Any dissenting views
 
-## Article VI: Technical Governance
+## 5. Assets and Finance
 
-### Section 6.1: Technical Council
+### 5.1 Asset Lock
 
-The Technical Council has authority over:
-- Architecture and design decisions
-- Release criteria and schedules
-- Coding standards and tooling
-- Security policies
+The Cooperative's assets are held in trust for its mission. Upon dissolution:
+1. Debts and liabilities shall be paid
+2. Remaining assets shall be transferred to another cooperative, charity, or community organisation with compatible purposes
+3. Assets may **never** be distributed to members as individuals or to any for-profit entity
 
-### Section 6.2: Technical Decision Process
+### 5.2 Prohibition on Sale
 
-1. **Proposal**: Any contributor may submit a technical proposal
-2. **Discussion**: Minimum two-week discussion period
-3. **Decision**: Technical Council decides by consensus; failing that, by two-thirds vote
-4. **Appeal**: Decisions may be appealed to the Board within 30 days
+The Cooperative may not be sold, acquired, or merged with a for-profit entity. Any merger must be with another cooperative or non-profit organisation and requires 3/4 approval of the General Assembly.
 
-### Section 6.3: Security Decisions
+### 5.3 Transparency
 
-Security decisions (vulnerability response, embargo policies) may be made by the Security Team with expedited procedures, but must be ratified by the Technical Council within 90 days.
+Financial records shall be available to all members. An annual financial report shall be published publicly.
 
-## Article VII: Amendments
+## 6. Intellectual Property
 
-### Section 7.1: Proposal
+### 6.1 Licensing
 
-Amendments to these Articles may be proposed by:
-- The Board
-- Petition of 25% of Contributor Members
+All software produced by the Cooperative shall be released under open source licenses approved by the Open Source Initiative. The default licenses are MIT and AGPL-3.0-or-later (user's choice).
 
-### Section 7.2: Process
+### 6.2 Trademarks
 
-1. Amendment text published at least 30 days before vote
-2. Discussion period with opportunity for friendly amendments
-3. Vote at General Meeting (or electronic vote with equivalent notice)
-4. Requires three-quarters majority of Contributor Members voting
+The Cooperative may hold trademarks to protect the integrity of the project. Trademark policy shall balance protection against misuse with permissive use for legitimate purposes.
 
-## Article VIII: Dissolution
+### 6.3 No Assignment Required
 
-### Section 8.1: Grounds
+Contributors retain copyright in their contributions. The Cooperative does not require copyright assignment. Contributors grant a license sufficient for the Cooperative to distribute their contributions under the project's licenses.
 
-The Cooperative may be dissolved if:
-- Its mission can no longer be fulfilled
-- Membership falls below minimum viable levels
-- By vote of nine-tenths of Contributor Members
+### 6.4 Contributor Licensing
 
-### Section 8.2: Asset Distribution
+All contributions must be made under the Developer Certificate of Origin (DCO), signed off with each commit. No Contributor License Agreement (CLA) is required.
 
-Upon dissolution:
-1. All debts and obligations shall be satisfied
-2. All software and documentation shall remain under open source licenses
-3. Remaining assets shall be transferred to an organization with compatible mission, as determined by the final General Meeting
+## 7. Forking
 
-## Appendix A: Initial Formation
+### 7.1 Right to Fork
 
-During the initial formation phase (until the first AGM with at least 10 Contributor Members):
+The right to fork is fundamental to free software and is explicitly protected. Any person may fork Cerro Torre at any time for any reason.
 
-- The founder serves as interim Board
-- Decisions follow these Articles in spirit
-- First priority is establishing the Technical Council
-- Goal is transition to full cooperative governance within two years
+### 7.2 Trademark Limitations
+
+Forks may not use the "Cerro Torre" name or logo without permission. This is the sole limitation on forking.
+
+### 7.3 Cooperative Response
+
+If a fork emerges due to governance failures, the Cooperative shall treat this as a signal to examine and address underlying problems, not as an attack to be resisted.
+
+## 8. Amendments
+
+These Articles may be amended by:
+1. A proposal submitted to the Coordinating Council
+2. A 30-day comment period
+3. A 3/4 majority vote of the General Assembly with 50% quorum
+
+No amendment may:
+- Remove the asset lock (Section 5.1)
+- Remove the prohibition on sale (Section 5.2)
+- Remove the right to fork (Section 7.1)
+- Remove the requirement for open source licensing (Section 6.1)
+
+## 9. Dissolution
+
+The Cooperative may be dissolved by a 3/4 vote of the General Assembly with 60% quorum, after:
+1. A 90-day notice period
+2. Good-faith effort to find an organisation to continue the mission
+
+Upon dissolution, the asset lock (Section 5.1) applies.
+
+## 10. Initial Formation
+
+### 10.1 Bootstrapping
+
+Until the Cooperative is formally incorporated and has 5 Maintainer Members:
+- The founder(s) act as interim Coordinating Council
+- New Maintainer Members may be admitted by founder approval
+- These Articles apply as written policy, not yet as legal bylaws
+
+### 10.2 Incorporation
+
+The Cooperative shall incorporate as a legal entity (Community Interest Company, Cooperative Society, or equivalent) within 12 months of reaching 5 Maintainer Members, or sooner if funds permit.
+
+### 10.3 Transition
+
+Upon incorporation:
+- These Articles become the legal governing documents (adapted as required by law)
+- An initial General Assembly elects proper governance bodies
+- Interim decisions are ratified or revised
 
 ---
 
-*These Articles are a living document. They should be revisited and refined as the project grows and learns from experience.*
+## Appendix: Founding Values
+
+These Articles encode the following values:
+
+**Democracy**: Those who do the work govern the project. No benevolent dictator, no corporate owner.
+
+**Transparency**: Decisions are made in public, documented, and explained.
+
+**Sustainability**: The asset lock and sale prohibition ensure the Cooperative cannot be captured or extracted from.
+
+**Humility**: The right to fork is protected because we might be wrong. Competition keeps us honest.
+
+**Solidarity**: The Cooperative exists to serve its community, not to accumulate power or wealth.
+
+---
+
+*Drafted December 2024. To be ratified upon formation.*
