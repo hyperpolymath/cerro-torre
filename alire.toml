@@ -1,0 +1,47 @@
+name = "cerro_torre"
+description = "Supply-chain-verified Linux distribution tooling"
+version = "0.1.0-dev"
+
+authors = ["Cerro Torre Cooperative"]
+maintainers = ["cerro-torre@example.org"]
+maintainers-logins = ["cerro-torre"]
+
+licenses = "Apache-2.0 OR MIT"
+website = "https://cerro-torre.org"
+tags = ["security", "supply-chain", "linux", "containers", "provenance"]
+
+[build-profiles]
+"*".Proof = { switches = ["-gnatVa", "-gnaty3abcefhiklmnoprstux"] }
+"*".Development = { switches = ["-g", "-gnata", "-gnatVa", "-gnatwa", "-gnatyM120"] }
+"*".Release = { switches = ["-O2", "-gnatn", "-gnatVa"] }
+
+# Note: Dependencies are listed but may require crate availability in Alire index
+# Some may need manual setup or alternative crates
+
+[[depends-on]]
+gnatcoll = ">=24.0.0"
+
+# For TOML parsing (manifest files)
+[[depends-on]]
+toml_slicer = "*"
+
+# For JSON handling
+[[depends-on]]
+json_ada = "*"
+
+[[executables]]
+cerro = "src/cli/cerro_main.adb"
+
+[gpr-externals]
+CERRO_BUILD_MODE = ["Development", "Release", "Proof"]
+
+[gpr-set-externals]
+CERRO_BUILD_MODE = "Development"
+
+[configuration]
+generate_ada = true
+generate_gpr = true
+generate_c = false
+
+[origin]
+# This will be filled in when published to Alire index

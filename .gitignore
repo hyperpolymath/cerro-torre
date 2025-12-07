@@ -1,0 +1,29 @@
+# Ada/GNAT build artifacts
+obj/
+bin/
+lib/
+*.o
+*.ali
+*.exe
+b__*.ad[sb]
+
+# Alire artifacts
+alire/
+config/
+
+# SPARK/GNATprove artifacts
+gnatprove/
+
+# Editor artifacts
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Documentation build
+doc/api/
