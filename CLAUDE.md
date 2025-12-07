@@ -48,36 +48,37 @@ alr build
 ### Directory Structure
 
 ```
-src/
-├── core/                    # SPARK-verified core
-│   ├── cerro_crypto.ads     # Cryptographic operations
-│   ├── cerro_crypto.adb
-│   ├── cerro_manifest.ads   # Manifest parsing
-│   ├── cerro_manifest.adb
-│   ├── cerro_provenance.ads # Provenance chain
-│   ├── cerro_provenance.adb
-│   └── cerro_verify.ads     # Verification logic
-│
-├── importers/               # Package source importers
-│   ├── debian/              # Debian .dsc importer
-│   ├── fedora/              # Fedora SRPM importer
-│   └── alpine/              # Alpine APKBUILD importer
-│
-├── exporters/               # Output format exporters
-│   ├── oci/                 # OCI container images
-│   ├── ostree/              # OSTree commits
-│   └── deb/                 # .deb compatibility
-│
-├── build/                   # Build orchestration
-│   ├── cerro_builder.ads
-│   └── cerro_builder.adb
-│
-├── policy/                  # SELinux policy generation
-│   ├── cerro_selinux.ads
-│   └── cerro_selinux.adb
-│
-└── cli/                     # Command-line interface
-    └── cerro_main.adb
+cerro-torre/
+├── docs/                    # Project documentation
+│   ├── ARCHITECTURE.md      # System architecture
+│   └── ROADMAP.md           # Development roadmap
+├── governance/              # Cooperative governance
+│   ├── articles.md          # Articles of association
+│   ├── covenant.md          # Palimpsest Covenant
+│   └── decisions/           # Architectural decision records
+├── keys/                    # Public keys for verification
+├── manifests/               # Package manifests (.ctp files)
+├── spec/                    # Specifications
+│   └── manifest-format.md   # CTP manifest specification
+└── src/
+    ├── core/                # SPARK-verified core
+    │   ├── cerro_crypto.*   # Cryptographic operations
+    │   ├── cerro_manifest.* # Manifest parsing
+    │   ├── cerro_provenance.* # Provenance chain
+    │   └── cerro_verify.*   # Verification logic
+    ├── build/               # Build orchestration
+    │   └── cerro_builder.*
+    ├── policy/              # SELinux policy generation
+    │   └── cerro_selinux.*
+    ├── importers/           # Package source importers
+    │   ├── debian/          # Debian .dsc importer
+    │   ├── fedora/          # Fedora SRPM importer
+    │   └── alpine/          # Alpine APKBUILD importer
+    ├── exporters/           # Output format exporters
+    │   ├── oci/             # OCI container images
+    │   └── rpm-ostree/      # OSTree/rpm-ostree integration
+    └── cli/                 # Command-line interface
+        └── cerro_main.adb
 ```
 
 ### Key Data Types
@@ -208,8 +209,11 @@ podman run cerro-torre/hello:2.10-3
 ## Context Links
 
 - Manifest format specification: `spec/manifest-format.md`
+- Architecture: `docs/ARCHITECTURE.md`
+- Roadmap: `docs/ROADMAP.md`
 - Governance: `governance/articles.md`
 - Palimpsest Covenant: `governance/covenant.md`
+- Decision records: `governance/decisions/`
 
 ## Questions to Resolve
 

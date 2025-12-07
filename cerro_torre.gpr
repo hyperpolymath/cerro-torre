@@ -21,8 +21,7 @@ project Cerro_Torre is
       "src/importers/fedora",
       "src/importers/alpine",
       "src/exporters/oci",
-      "src/exporters/ostree",
-      "src/exporters/deb"
+      "src/exporters/rpm-ostree"
    );
 
    for Object_Dir use "obj/" & Build_Mode;
