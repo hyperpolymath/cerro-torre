@@ -20,7 +20,7 @@ The core tooling is written in Ada with SPARK annotations for formally verified 
 **Use SPARK for:**
 - All cryptographic operations (hashing, signature verification)
 - Manifest parsing and validation
-- Provenance chain verification
+- Provenance chain verification  
 - SELinux policy generation/validation
 - Any code that touches security-critical data
 
@@ -121,21 +121,21 @@ package Cerro_Crypto
    with SPARK_Mode => On
 is
    type Digest_256 is array (1 .. 32) of Unsigned_8;
-
+   
    function SHA256_Hash (Data : String) return Digest_256
       with Global => null,
            Pre    => Data'Length <= Natural'Last - 64,
            Post   => SHA256_Hash'Result'Length = 32;
-
+   
    function Verify_Signature
       (Data      : String;
        Signature : String;
        Public_Key: String) return Boolean
       with Global => null,
-           Pre    => Data'Length > 0
+           Pre    => Data'Length > 0 
                      and Signature'Length = 64
                      and Public_Key'Length = 32;
-
+                     
 end Cerro_Crypto;
 ```
 
