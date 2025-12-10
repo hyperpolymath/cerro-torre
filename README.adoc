@@ -1,29 +1,29 @@
-# Cerro Torre
+= Cerro Torre
 
-**Provenance-verified containers from democratically-governed sources.**
+*Provenance-verified containers from democratically-governed sources.*
 
 Cerro Torre is a supply-chain-verified Linux distribution for containers and immutable systems. It combines formally verified tooling, radical transparency, and cooperative governance — built primarily on Debian's democratically-governed package ecosystem.
 
 The name references Patagonia's most technically demanding peak. Cerro Torre stands for doing things properly: fair means, complete transparency, no shortcuts.
 
-## Why Cerro Torre?
+== Why Cerro Torre?
 
 The container base image landscape offers:
 
-- **Alpine**: Minimal and excellent, but limited supply chain transparency
-- **Wolfi**: Strong security focus, but governed by a VC-backed company
+- *Alpine*: Minimal and excellent, but limited supply chain transparency
+- *Wolfi*: Strong security focus, but governed by a VC-backed company
 
 Cerro Torre offers a third path:
 
 | Principle | What It Means |
 |-----------|---------------|
-| **Formally Verified** | Core tooling written in Ada/SPARK with machine-checked proofs |
-| **Democratically Governed** | Multi-stakeholder cooperative, no corporate parent |
-| **Radically Transparent** | Complete cryptographic provenance for every package |
-| **Format Agnostic** | Import from Debian, Fedora, Alpine — not locked to any upstream |
-| **Ethically Committed** | The Palimpsest Covenant articulates our values |
+| *Formally Verified* | Core tooling written in Ada/SPARK with machine-checked proofs |
+| *Democratically Governed* | Multi-stakeholder cooperative, no corporate parent |
+| *Radically Transparent* | Complete cryptographic provenance for every package |
+| *Format Agnostic* | Import from Debian, Fedora, Alpine — not locked to any upstream |
+| *Ethically Committed* | The Palimpsest Covenant articulates our values |
 
-## Architecture
+== Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -58,50 +58,50 @@ Cerro Torre offers a third path:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### The Manifest Format
+=== The Manifest Format
 
 Cerro Torre packages are defined in `.ctp` manifest files — a declarative, Turing-incomplete format designed for formal verification. Package definitions cannot contain arbitrary computation, making them analysable and provable.
 
 See [spec/manifest-format.md](spec/manifest-format.md) for the full specification.
 
-### Import Sources
+=== Import Sources
 
-**Primary: Debian** — Chosen for governance alignment. Debian is genuinely community-governed with constitutional documents, elected leadership, and no corporate owner. Building on democratic foundations matters for a democratically-governed project.
+*Primary: Debian* — Chosen for governance alignment. Debian is genuinely community-governed with constitutional documents, elected leadership, and no corporate owner. Building on democratic foundations matters for a democratically-governed project.
 
-**Secondary: Fedora** — For packages where Fedora's version is better maintained, and for SELinux reference policies.
+*Secondary: Fedora* — For packages where Fedora's version is better maintained, and for SELinux reference policies.
 
-**Extensible**: The importer architecture allows community contribution of additional sources (Alpine, Nix, Arch, etc.).
+*Extensible*: The importer architecture allows community contribution of additional sources (Alpine, Nix, Arch, etc.).
 
-### Security
+=== Security
 
-- **SELinux Enforcing**: First-class SELinux support with auto-generated per-container policies
-- **Threshold Signing**: k-of-n keyholders required for releases; no single point of trust
-- **Federated Transparency**: Multiple independent log operators; threshold agreement required
-- **Reproducible Builds**: Any party can rebuild and verify packages
+- *SELinux Enforcing*: First-class SELinux support with auto-generated per-container policies
+- *Threshold Signing*: k-of-n keyholders required for releases; no single point of trust
+- *Federated Transparency*: Multiple independent log operators; threshold agreement required
+- *Reproducible Builds*: Any party can rebuild and verify packages
 
-## Licensing
+== Licensing
 
 Cerro Torre tooling is dual-licensed under your choice of:
 
-- **MIT License** — Maximum permissiveness
-- **AGPL-3.0-or-later** — Copyleft with network provisions
+- *MIT License* — Maximum permissiveness
+- *AGPL-3.0-or-later* — Copyleft with network provisions
 
-The **Palimpsest Covenant** travels alongside as a values commitment (not a legal requirement). Community members are encouraged to adopt it.
+The *Palimpsest Covenant* travels alongside as a values commitment (not a legal requirement). Community members are encouraged to adopt it.
 
 Packages retain their upstream licenses.
 
-## Governance
+== Governance
 
 Cerro Torre is owned by a multi-stakeholder cooperative with:
 
-- **Maintainer Members**: Active package/infrastructure maintainers (one person, one vote on technical decisions)
-- **User Members**: Organisations and individuals using Cerro Torre in production (vote on strategic direction)
-- **Asset Lock**: If dissolved, assets go to another cooperative or charity, never to private interests
-- **Fork Protection**: Forking is explicitly encouraged; the cooperative exists to be useful, not to control
+- *Maintainer Members*: Active package/infrastructure maintainers (one person, one vote on technical decisions)
+- *User Members*: Organisations and individuals using Cerro Torre in production (vote on strategic direction)
+- *Asset Lock*: If dissolved, assets go to another cooperative or charity, never to private interests
+- *Fork Protection*: Forking is explicitly encouraged; the cooperative exists to be useful, not to control
 
 See [governance/](governance/) for full documentation.
 
-## Project Structure
+== Project Structure
 
 ```
 cerro-torre/
@@ -124,24 +124,24 @@ cerro-torre/
 └── docs/                    # Documentation
 ```
 
-## Status
+== Status
 
-**Phase 0: Foundations** (Current)
+*Phase 0: Foundations* (Current)
 
 - [ ] Manifest format specification
 - [ ] Governance documents
 - [ ] Ada/SPARK proof of concept
 - [ ] Software Freedom Conservancy application
 
-## Getting Involved
+== Getting Involved
 
 Read the [Palimpsest Covenant](governance/covenant.md) first. If those values resonate, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Links
+== Links
 
-- **Repository**: [GitLab](https://gitlab.com/cerro-torre) (primary), mirrors TBD
-- **Governance**: [Cooperative Documents](governance/)
-- **Specification**: [Manifest Format](spec/manifest-format.md)
+- *Repository*: [GitLab](https://gitlab.com/cerro-torre) (primary), mirrors TBD
+- *Governance*: [Cooperative Documents](governance/)
+- *Specification*: [Manifest Format](spec/manifest-format.md)
 
 ---
 
