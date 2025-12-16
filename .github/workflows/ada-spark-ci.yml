@@ -5,7 +5,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Setup GNAT
         run: |
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     if: hashFiles('**/*.ads') != ''
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: SPARK proof
         run: |
           echo "SPARK proof would run here with gnatprove"
