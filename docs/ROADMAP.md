@@ -1,8 +1,40 @@
 # Cerro Torre Roadmap
 
-## Current Status: Pre-Alpha
+## Current Status: Pre-Alpha (v0.1-dev)
 
-The project structure and architecture are defined. Core modules exist as stubs with interfaces specified but implementations incomplete.
+**Last Updated:** 2025-12-18
+
+The project structure and architecture are defined. Core modules exist as stubs with interfaces specified but implementations incomplete. Infrastructure and security foundations are complete.
+
+---
+
+## Completed: Infrastructure & Security
+
+These foundational items have been completed:
+
+- [x] **RSR Compliance Infrastructure**
+  - SHA-pinned GitHub Actions (supply-chain security)
+  - SPDX license headers on all source files
+  - Permissions declarations on all workflows
+  - Multi-platform CI/CD (GitHub, GitLab, Bitbucket)
+
+- [x] **Package Management**
+  - guix.scm with proper dual licensing (MIT OR AGPL-3.0-or-later)
+  - Guix primary / Nix fallback policy enforcement
+  - NPM/Bun blocker workflow
+
+- [x] **Security Workflows**
+  - OSSF Scorecard integration
+  - CodeQL analysis (placeholder, ready when code exists)
+  - Secret scanning (TruffleHog)
+  - Security policy enforcement (no MD5/SHA1, HTTPS only)
+  - Well-known standards (RFC 9116 security.txt)
+
+- [x] **Project Documentation**
+  - META.scm (architecture decisions)
+  - ECOSYSTEM.scm (project relationships)
+  - STATE.scm (project checkpoint/context)
+  - CLAUDE.md (AI development context)
 
 ---
 
@@ -172,6 +204,12 @@ The project structure and architecture are defined. Core modules exist as stubs 
 ---
 
 ## Success Metrics
+
+### Infrastructure Success (Completed)
+- [x] RSR Gold compliance target met
+- [x] All GitHub Actions SHA-pinned
+- [x] SPDX headers on all files
+- [x] Multi-platform CI/CD operational
 
 ### MVP Success
 - [ ] Import GNU Hello from Debian

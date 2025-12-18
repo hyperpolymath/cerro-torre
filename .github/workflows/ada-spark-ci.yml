@@ -1,17 +1,20 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 name: Ada/SPARK CI
 on: [push, pull_request]
+
+permissions: read-all
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
       - name: Setup GNAT
         run: |
           sudo apt-get update
           sudo apt-get install -y gnat gprbuild
-      
+
       - name: Build
         run: |
           if [ -f "*.gpr" ]; then
@@ -21,7 +24,7 @@ jobs:
             unzip alr.zip
             ./alr build
           fi
-      
+
       - name: Run tests
         run: |
           if command -v gnattest &> /dev/null; then
@@ -32,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     if: hashFiles('**/*.ads') != ''
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: SPARK proof
         run: |
           echo "SPARK proof would run here with gnatprove"

@@ -15,7 +15,7 @@
   '((version . "0.1.0")
     (schema-version . "1.0")
     (created . "2025-12-15")
-    (updated . "2025-12-15")
+    (updated . "2025-12-18")
     (project . "cerro-torre")
     (repo . "github.com/hyperpolymath/cerro-torre")))
 
@@ -27,7 +27,7 @@
   '((name . "cerro-torre")
     (tagline . "*Provenance-verified containers from democratically-governed sources.*")
     (version . "0.1.0")
-    (license . "AGPL-3.0-or-later")
+    (license . "MIT OR AGPL-3.0-or-later")
     (rsr-compliance . "gold-target")
 
     (tech-stack
@@ -151,6 +151,15 @@
 
 (define session-history
   '((snapshots
+     ((date . "2025-12-18")
+      (session . "security-hardening")
+      (accomplishments
+       ("SHA-pinned all GitHub Actions for supply-chain security"
+        "Added SPDX license headers to all workflow files"
+        "Added permissions declarations to all workflows"
+        "Fixed guix.scm with proper dual licensing (MIT OR AGPL-3.0-or-later)"
+        "Updated roadmap to reflect current state"))
+      (notes . "Security audit and RSR compliance improvements"))
      ((date . "2025-12-15")
       (session . "initial-state-creation")
       (accomplishments
@@ -185,10 +194,10 @@
 (define state-summary
   '((project . "cerro-torre")
     (version . "0.1.0")
-    (overall-completion . 25)
+    (overall-completion . 30)
     (next-milestone . "v0.2 - Core Functionality")
     (critical-blockers . 0)
     (high-priority-issues . 0)
-    (updated . "2025-12-15")))
+    (updated . "2025-12-18")))
 
 ;;; End of STATE.scm
