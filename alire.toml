@@ -25,9 +25,19 @@ gnatcoll = ">=24.0.0"
 [[depends-on]]
 toml_slicer = "*"
 
-# For JSON handling
+# For JSON handling (provenance, SBOM output)
 [[depends-on]]
 json_ada = "*"
+
+# For HTTP client (source fetching) - MVP
+# Uncomment when ready to implement fetcher
+# [[depends-on]]
+# aws = ">=24.0.0"
+
+# For cryptography (SHA256, Ed25519) - MVP
+# Uncomment when libsodium-ada binding is available or use manual C binding
+# [[depends-on]]
+# libsodium = "*"
 
 [[executables]]
 cerro = "src/cli/cerro_main.adb"

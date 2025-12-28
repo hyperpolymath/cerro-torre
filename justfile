@@ -8,22 +8,49 @@ project := "Cerro-Torre"
 default:
     @just --list --unsorted
 
-# Build
+# Build the project
 build:
-    @echo "TODO: Add build command"
+    alr build
 
-# Test
+# Run tests
 test:
-    @echo "TODO: Add test command"
+    alr build
+    @echo "Unit tests not yet implemented - see docs/MVP-PLAN.md"
 
-# Clean
+# Clean build artifacts
 clean:
-    @echo "TODO: Add clean command"
+    alr clean
+    rm -rf obj/ lib/
 
-# Format
+# Format Ada code (uses gnatpp if available)
 fmt:
-    @echo "TODO: Add format command"
+    @if command -v gnatpp &> /dev/null; then \
+        find src -name "*.adb" -o -name "*.ads" | xargs gnatpp -i3 -M100; \
+    else \
+        echo "gnatpp not found - install GNAT tools for formatting"; \
+    fi
 
-# Lint
+# Lint/check Ada code
 lint:
-    @echo "TODO: Add lint command"
+    alr build -- -gnatwa -gnatwe
+
+# Run SPARK proofs (requires gnatprove)
+prove:
+    @if command -v gnatprove &> /dev/null; then \
+        gnatprove -P cerro_torre.gpr --level=2; \
+    else \
+        echo "gnatprove not found - requires SPARK Pro or Community"; \
+    fi
+
+# Build and run the CLI
+run *args:
+    alr run -- {{args}}
+
+# Build the ATS2 shadow verifier
+shadow-build:
+    @if command -v patscc &> /dev/null; then \
+        patscc -O2 -DATS_MEMALLOC_LIBC -o ct-shadow tools/ats-shadow/main.dats; \
+    else \
+        echo "patscc not found - install ATS2 for shadow verifier"; \
+    fi
+

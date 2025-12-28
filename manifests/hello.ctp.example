@@ -1,50 +1,47 @@
-# Example Cerro Torre Package Manifest
-# This is a template - actual manifests omit the .example extension
+# Cerro Torre Package Manifest
+# GNU Hello - demonstration package
 
-manifest-version = "0.1.0"
-
-[package]
+[metadata]
 name = "hello"
-version = "2.10-1"
+version = "2.10"
+revision = 1
 epoch = 0
 summary = "Famous friendly greeting program"
 description = """
 The GNU Hello program produces a familiar, friendly greeting.
 It allows non-programmers to use a classic computer science tool.
 """
+license = "GPL-3.0-or-later"
+homepage = "https://www.gnu.org/software/hello/"
+maintainer = "cerro-torre:core-team"
 
 [provenance]
-upstream-url = "https://ftp.gnu.org/gnu/hello/hello-2.10.tar.gz"
-upstream-hash = { algorithm = "sha256", digest = "31e066137a962676e89f69d1b65382de95a7ef7d914b8cb956f41ea72e0f516b" }
-upstream-signature = "https://ftp.gnu.org/gnu/hello/hello-2.10.tar.gz.sig"
-upstream-signer = "gnu-keyring:0x7F2D434B9741E8AC"
-imported-from = "debian:hello/2.10-3"
-import-date = 2024-01-15T14:30:00Z
+upstream = "https://ftp.gnu.org/gnu/hello/hello-2.10.tar.gz"
+upstream_hash = "sha256:31e066137a962676e89f69d1b65382de95a7ef7d914b8cb956f41ea72e0f516b"
+upstream_signature = "https://ftp.gnu.org/gnu/hello/hello-2.10.tar.gz.sig"
+upstream_keyring = "gnu-keyring:0x7F2D434B9741E8AC"
+imported_from = "debian:hello/2.10-3"
+import_date = 2025-01-15T14:30:00Z
+
+[dependencies]
+runtime = ["libc"]
+build = ["gcc", "make", "gettext"]
 
 [build]
-system = "autotools"
-dependencies = ["gcc", "make", "gettext"]
+system = "autoconf"
+configure_flags = ["--prefix=/usr"]
 
 [build.environment]
 CFLAGS = "-O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2"
 LDFLAGS = "-Wl,-z,relro -Wl,-z,now"
 
-[build.commands]
-configure = "./configure --prefix=/usr"
-build = "make -j$(nproc)"
-install = "make DESTDIR=$DESTDIR install"
+[outputs]
+primary = "hello"
 
-[runtime]
-dependencies = ["glibc"]
+[outputs.files]
+"/usr/bin/hello" = { mode = "0755" }
+"/usr/share/man/man1/hello.1.gz" = { mode = "0644" }
 
-[[runtime.files]]
-path = "/usr/bin/hello"
-hash = { algorithm = "sha256", digest = "0000000000000000000000000000000000000000000000000000000000000000" }
-mode = "0755"
-type = "executable"
-
-[[runtime.files]]
-path = "/usr/share/man/man1/hello.1.gz"
-hash = { algorithm = "sha256", digest = "0000000000000000000000000000000000000000000000000000000000000000" }
-mode = "0644"
-type = "documentation"
+[attestations]
+require = ["source-signature"]
+recommend = ["reproducible-build"]

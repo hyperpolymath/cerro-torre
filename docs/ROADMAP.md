@@ -42,6 +42,7 @@ The project structure and architecture are defined. Core modules exist as stubs 
 
 - [ ] **Ed25519 Signature Verification**
   - Verify existing signatures on manifests
+  - Algorithm-agile format (future ML-DSA support)
   - Don't need signing yet, just verification
 
 - [ ] **OCI Export (Basic)**
@@ -49,20 +50,35 @@ The project structure and architecture are defined. Core modules exist as stubs 
   - Single-layer scratch-based image
   - Works with `podman load`
 
+- [ ] **SBOM Generation (Basic)**
+  - SPDX 2.3 JSON format
+  - Package name, version, files, license
+  - Embedded in build output
+
+- [ ] **Provenance Statement**
+  - in-toto/SLSA v1.0 format
+  - Records manifest hash, source hashes, builder
+  - Signed with build key
+
 ### Nice to Have
 
 - [ ] **Build Execution**
-  - Run autotools configure/make/install
-  - Capture build in temporary directory
+  - Run autotools configure/make/install in Podman
+  - Capture build in staging directory
   - Hash resulting files
 
 ---
 
 ## v0.2 — "Base Camp"
 
-**Goal:** Support multiple packages with dependencies
+**Goal:** Support multiple packages with dependencies, add post-quantum signatures
 
 ### Features
+
+- [ ] **ML-DSA-65 (Dilithium) Signatures**
+  - Add liboqs Ada bindings
+  - Hybrid Ed25519 + ML-DSA signing
+  - Post-quantum verification support
 
 - [ ] **Dependency Resolution**
   - Parse dependency specifications
@@ -70,7 +86,7 @@ The project structure and architecture are defined. Core modules exist as stubs 
   - Handle circular dependency detection
 
 - [ ] **Package Signing**
-  - Generate Ed25519 keypairs
+  - Generate Ed25519 and ML-DSA keypairs
   - Sign manifests as builder/maintainer
   - Key management basics
 
@@ -111,15 +127,19 @@ The project structure and architecture are defined. Core modules exist as stubs 
   - Parse APKBUILD files
   - Support aports repository
 
-- [ ] **SBOM Generation**
-  - SPDX format output
-  - CycloneDX format output
-  - Embedded in OCI images
+- [ ] **Enhanced SBOM**
+  - CycloneDX format (in addition to SPDX)
+  - Vulnerability correlation
+  - Dependency tree visualization
 
 - [ ] **Web UI (Read-Only)**
   - Browse packages
   - View provenance chains
   - Verify signatures online
+
+- [ ] **Ed25519 Deprecation Evaluation**
+  - Assess quantum threat timeline
+  - Plan transition to ML-DSA-only if appropriate
 
 ---
 
