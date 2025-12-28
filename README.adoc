@@ -142,6 +142,7 @@ Read the [Palimpsest Covenant](governance/covenant.md) first. If those values re
 - *Repository*: [GitLab](https://gitlab.com/cerro-torre) (primary), mirrors TBD
 - *Governance*: [Cooperative Documents](governance/)
 - *Specification*: [Manifest Format](spec/manifest-format.md)
+- *Canonical Authority*: [Verification Policy](docs/handovers/)
 
 ---
 
