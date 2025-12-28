@@ -30,10 +30,18 @@ json = "*"
 # [[depends-on]]
 # aws = ">=24.0.0"
 
+# For HTTP client (source fetching) - MVP
+# Uncomment when ready to implement fetcher
+# [[depends-on]]
+# aws = ">=24.0.0"
+
 # For cryptography (SHA256, Ed25519) - MVP
 # Uncomment when libsodium-ada binding is available or use manual C binding
 # [[depends-on]]
 # libsodium = "*"
+
+[[executables]]
+cerro = "src/cli/cerro_main.adb"
 
 [gpr-externals]
 CERRO_BUILD_MODE = ["Development", "Release", "Proof"]

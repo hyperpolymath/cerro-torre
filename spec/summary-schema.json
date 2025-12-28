@@ -13,7 +13,8 @@
     "inputs",
     "build_plan",
     "outputs",
-    "policy"
+    "policy",
+    "security"
   ],
   "properties": {
     "schema_version": {
@@ -374,27 +375,116 @@
         }
       }
     },
+    "security": {
+      "type": "object",
+      "description": "Crypto suite commitment. The suite_id is covered by signatures to prevent downgrade.",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "algorithms",
+        "binding_digest"
+      ],
+      "properties": {
+        "suite_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Suite identifier from spec/crypto-suites.json (e.g., CT-SIG-01, CT-SIG-02)."
+        },
+        "algorithms": {
+          "type": "object",
+          "description": "Resolved algorithm set from the suite registry.",
+          "additionalProperties": false,
+          "required": [
+            "hash",
+            "signatures"
+          ],
+          "properties": {
+            "hash": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "output_bits"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "output_bits": {
+                  "type": "integer"
+                }
+              }
+            },
+            "signatures": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "required"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "binding_digest": {
+          "type": "object",
+          "description": "The digest that binds the manifest to signatures.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "value"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Digest algorithm (e.g., sha256)."
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "Hex-encoded digest value."
+            }
+          }
+        }
+      }
+    },
     "signatures": {
       "type": "array",
-      "description": "Signatures over this summary (algorithm-agile format).",
+      "description": "Signatures over this summary. Suite-committed: each signature includes suite_id.",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "suite_id",
+          "key_id",
           "algorithm",
-          "keyid",
-          "sig"
+          "signature"
         ],
         "properties": {
-          "algorithm": {
+          "suite_id": {
             "type": "string",
-            "description": "Signature algorithm: ed25519, ml-dsa-65, etc."
+            "description": "Suite ID this signature belongs to. Must match security.suite_id."
           },
-          "keyid": {
+          "key_id": {
             "type": "string",
             "description": "Key identifier from trust store."
           },
-          "sig": {
+          "algorithm": {
+            "type": "string",
+            "description": "Signature algorithm: ed25519, ml-dsa-87, ed448, etc."
+          },
+          "signature": {
             "type": "string",
             "description": "Base64-encoded signature."
           }

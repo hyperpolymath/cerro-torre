@@ -182,5 +182,31 @@
       ]
     }
   },
-  "signatures": []
+  "security": {
+    "suite_id": "CT-SIG-01",
+    "algorithms": {
+      "hash": {
+        "id": "sha256",
+        "output_bits": 256
+      },
+      "signatures": [
+        {
+          "id": "ed25519",
+          "required": true
+        }
+      ]
+    },
+    "binding_digest": {
+      "id": "sha256",
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "signatures": [
+    {
+      "suite_id": "CT-SIG-01",
+      "key_id": "cerro-dev-2025",
+      "algorithm": "ed25519",
+      "signature": "PLACEHOLDER_BASE64_SIGNATURE"
+    }
+  ]
 }
