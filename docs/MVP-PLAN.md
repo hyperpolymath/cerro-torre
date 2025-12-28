@@ -70,10 +70,23 @@ podman run cerro-torre/hello:2.10-3
    ```
    dist/<build-id>/
    ├── image.tar              # OCI image tarball
+   ├── canonical.ctp          # Canonicalized manifest
+   ├── summary.json           # Build summary with digests
    ├── sbom.spdx.json         # SPDX SBOM
-   ├── provenance.jsonl       # in-toto attestation
+   ├── provenance.jsonl       # in-toto attestation (DSSE envelope)
    ├── digests.txt            # SHA256 of all outputs
-   └── signature.sig          # Ed25519 signature over digests.txt
+   └── signatures.json        # Algorithm-agile signatures
+   ```
+
+   **signatures.json format** (algorithm-agile from day 1):
+   ```json
+   {
+     "payload_type": "application/vnd.cerro-torre.digests+txt",
+     "payload_digest": "sha256:...",
+     "signatures": [
+       {"algorithm": "ed25519", "keyid": "dev-key-2025", "sig": "base64..."}
+     ]
+   }
    ```
 
 3. **Error Taxonomy**
@@ -275,11 +288,18 @@ cerro inspect <manifest.ctp>         # Show parsed manifest
   - Verify provenance chain
   - Run container and check output
 
+- **Shadow Verifier** (non-authoritative, CI-only):
+  - ATS2 tool at `tools/ats-shadow/` provides independent verification
+  - Checks: LF-only, no TAB, no trailing whitespace, key ordering
+  - Optional: digest coupling (`--check-digest`), idempotence (`--check-idempotence`)
+  - Different implementation language = different bugs (defense in depth)
+
 - **CI Pipeline** (`.gitlab-ci.yml`):
   ```yaml
   stages:
     - build
     - test
+    - shadow
     - integration
 
   build:
@@ -289,6 +309,13 @@ cerro inspect <manifest.ctp>         # Show parsed manifest
   test:
     script:
       - alr run cerro_tests
+
+  shadow-verify:
+    stage: shadow
+    script:
+      - patscc -O2 -DATS_MEMALLOC_LIBC -o ct-shadow tools/ats-shadow/main.dats
+      - ./ct-shadow --summary dist/summary.json --check-digest dist/canonical.ctp
+    allow_failure: true  # Non-authoritative
 
   integration:
     script:
@@ -311,6 +338,7 @@ cerro inspect <manifest.ctp>         # Show parsed manifest
 
 | Feature | Reason to Defer |
 |---------|-----------------|
+| ML-DSA-65 (Dilithium) signatures | Needs liboqs Ada bindings |
 | Debian signature chain (InRelease) | Complex PKI, not blocking demo |
 | Reproducible builds enforcement | Requires tooling integration |
 | Transparency log integration | Needs protocol finalization |
@@ -330,7 +358,43 @@ cerro inspect <manifest.ctp>         # Show parsed manifest
 
 ## Technical Decisions Required
 
-### Decision 1: Crypto Library
+### Decision 1: Signature Algorithm (DECIDED)
+
+**Context**: Cerro Torre attestations are meant to be verifiable for years or decades. Quantum computers could break Ed25519 by 2035, making historical attestations forgeable.
+
+| Factor | Ed25519 (libsodium) | Dilithium/ML-DSA-65 |
+|--------|--------------------|--------------------|
+| **Quantum resistance** | No (Shor's algorithm) | Yes (NIST FIPS 204) |
+| **Signature size** | 64 bytes | ~3,293 bytes |
+| **Public key size** | 32 bytes | ~1,952 bytes |
+| **Performance** | Faster | ~3-5x slower |
+| **Ada bindings** | libsodium-ada exists | Needs liboqs bindings |
+| **Standardization** | Mature | NIST standardized 2024 |
+
+**Decision**: Algorithm-agile signatures with phased rollout.
+
+**MVP (v0.1)**: Ed25519 via libsodium, but:
+- Design signature format to support multiple algorithms
+- Add `algorithm` field to all signature records
+- Document that Ed25519 is transitional
+
+**v0.2**: Add ML-DSA-65 (Dilithium) as primary, Ed25519 as fallback (hybrid optional)
+
+**v0.3+**: Evaluate Ed25519 deprecation policy
+
+**Signature Format** (algorithm-agile from day 1):
+```json
+{
+  "signatures": [
+    {"algorithm": "ed25519", "keyid": "...", "sig": "..."},
+    {"algorithm": "ml-dsa-65", "keyid": "...", "sig": "..."}
+  ]
+}
+```
+
+This ensures attestations signed today can be verified even after quantum computers arrive.
+
+### Decision 2: Crypto Library
 
 **Options**:
 1. **libsodium-ada bindings** (Recommended for MVP)
@@ -343,9 +407,13 @@ cerro inspect <manifest.ctp>         # Show parsed manifest
    - Fully provable
    - More integration work
 
-**Recommendation**: libsodium for MVP, migrate to SPARKNaCl when SPARK proofs become priority.
+3. **liboqs bindings** (Required for v0.2)
+   - Post-quantum algorithms (ML-DSA, ML-KEM)
+   - C library, needs Ada bindings
 
-### Decision 2: Build Isolation
+**Recommendation**: libsodium for MVP (Ed25519, SHA256). Add liboqs bindings in v0.2 for ML-DSA.
+
+### Decision 3: Build Isolation
 
 **Options**:
 1. **Podman container** (Recommended)
@@ -363,7 +431,7 @@ cerro inspect <manifest.ctp>         # Show parsed manifest
 
 **Recommendation**: Podman with pinned Debian base image.
 
-### Decision 3: HTTP Client
+### Decision 4: HTTP Client
 
 **Options**:
 1. **AWS (Ada Web Server)** (Recommended)
@@ -423,6 +491,8 @@ Week 2:
 | `.gitlab-ci.yml` | CI pipeline |
 | `docs/USAGE.md` | Command reference |
 | `docs/TRUST.md` | Trust model documentation |
+| `tools/ats-shadow/README.adoc` | Shadow verifier documentation |
+| `tools/ats-shadow/main.dats` | ATS2 shadow verifier (non-authoritative) |
 
 ### Modified Files
 
