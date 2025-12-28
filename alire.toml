@@ -10,14 +10,9 @@ licenses = "Apache-2.0 OR MIT"
 website = "https://cerro-torre.org"
 tags = ["security", "supply-chain", "linux", "containers", "provenance"]
 
-[build-profiles]
-"*".Proof = { switches = ["-gnatVa", "-gnaty3abcefhiklmnoprstux"] }
-"*".Development = { switches = ["-g", "-gnata", "-gnatVa", "-gnatwa", "-gnatyM120"] }
-"*".Release = { switches = ["-O2", "-gnatn", "-gnatVa"] }
+executables = ["cerro"]
 
-# Note: Dependencies are listed but may require crate availability in Alire index
-# Some may need manual setup or alternative crates
-
+# Dependencies - start minimal, add as needed
 [[depends-on]]
 gnatcoll = ">=24.0.0"
 
@@ -39,19 +34,8 @@ json_ada = "*"
 # [[depends-on]]
 # libsodium = "*"
 
-[[executables]]
-cerro = "src/cli/cerro_main.adb"
-
 [gpr-externals]
 CERRO_BUILD_MODE = ["Development", "Release", "Proof"]
 
 [gpr-set-externals]
 CERRO_BUILD_MODE = "Development"
-
-[configuration]
-generate_ada = true
-generate_gpr = true
-generate_c = false
-
-[origin]
-# This will be filled in when published to Alire index

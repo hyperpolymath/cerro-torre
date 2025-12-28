@@ -35,8 +35,7 @@ project Cerro_Torre is
          "-gnat2022",           --  Ada 2022 standard
          "-gnatwa",             --  Enable all warnings
          "-gnatwe",             --  Treat warnings as errors
-         "-gnatyM120",          --  Max line length 120
-         "-gnaty3abcefhiklmnoprstux"  --  Style checks
+         "-gnaty3abcefhiklnprstuxM120"  --  Style checks (no ordering) with 120 char lines
       );
 
       case Build_Mode is
