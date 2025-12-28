@@ -36,6 +36,25 @@ snapshot_timestamp = 2025-12-20T00:00:00Z
 import_date = 2025-12-28T00:00:00Z
 
 # ============================================================================
+# SECURITY — Crypto suite commitment (no downgrade)
+# ============================================================================
+
+[security]
+suite_id = "CT-SIG-01"
+payload_binding = "manifest.canonical_bytes_sha256"
+
+# Optional: algorithms block (must match registry if provided)
+# If omitted, resolved from spec/crypto-suites.json during summarization
+[security.algorithms]
+[security.algorithms.hash]
+id = "sha256"
+output_bits = 256
+
+[[security.algorithms.signatures]]
+id = "ed25519"
+required = true
+
+# ============================================================================
 # INPUTS — All sources with cryptographic hashes
 # ============================================================================
 
