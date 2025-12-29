@@ -29,6 +29,11 @@ project Cerro_Torre is
 
    for Main use ("cerro_main.adb");
 
+   --  Rename executable to "ct" (short for Cerro Torre)
+   package Naming is
+      for Executable ("cerro_main.adb") use "ct";
+   end Naming;
+
    --  Compiler switches based on build mode
    package Compiler is
       Common_Switches := (

@@ -1,5 +1,17 @@
 # Cerro Torre Roadmap
 
+## Philosophy
+
+Cerro Torre is "**ship containers safely**" — the distribution complement to Svalinn's "run containers nicely".
+
+A user should be able to:
+1. **Wrap** an OCI image into a verifiable bundle (`.ctp`)
+2. **Move** that bundle around (offline, airgapped, mirrors)
+3. **Verify** it deterministically
+4. **Install/run** it with minimal ceremony
+
+---
+
 ## Current Status: Pre-Alpha
 
 The project structure and architecture are defined. Core modules exist as stubs with interfaces specified but implementations incomplete.
@@ -8,209 +20,223 @@ The project structure and architecture are defined. Core modules exist as stubs 
 
 ## MVP v0.1 — "First Ascent"
 
-**Goal:** End-to-end demonstration with a single package (GNU Hello)
+**Goal:** Ergonomic CLI for pack/verify/explain with great errors
 
-### Must Have
+### Core Commands (Must Have)
 
-- [ ] **TOML Parser Integration**
-  - Integrate toml_slicer or equivalent Ada TOML library
-  - Parse .ctp manifest files into Manifest records
-  - Validate against manifest-format.md specification
+- [ ] **ct pack** — Create verifiable bundle from OCI image
+  ```bash
+  ct pack docker.io/library/nginx:1.26 -o nginx.ctp
+  ct pack oci:./local-image -o local.ctp
+  ```
+  - Read OCI image (via skopeo for MVP)
+  - Generate canonical manifest.toml
+  - Generate summary.json with all digests
+  - Sign with specified key (or default)
 
-- [ ] **SHA-256 Implementation**
-  - Either pure Ada implementation or libsodium bindings
-  - Hash file contents and compare to manifest
-  - Prove absence of runtime errors with SPARK
+- [ ] **ct verify** — Verify bundle with specific error codes
+  ```bash
+  ct verify nginx.ctp
+  ct verify nginx.ctp --policy strict.json
+  ```
+  - Exit 0: valid
+  - Exit 1: hash mismatch
+  - Exit 2: signature invalid
+  - Exit 3: key not trusted
+  - Exit 4: policy rejection
+  - Exit 10: malformed bundle
 
-- [ ] **Debian Importer (Basic)**
-  - Download .dsc from Debian mirrors
-  - Parse .dsc control file format
-  - Extract source tarball and debian/ directory
-  - Generate skeleton .ctp manifest
+- [ ] **ct explain** — Human-readable verification chain
+  ```bash
+  ct explain nginx.ctp
+  ct explain nginx.ctp --signers
+  ct explain nginx.ctp --layers
+  ```
+  - Package info, provenance, content hashes
+  - Signatures with fingerprints
+  - Trust chain status
 
-- [ ] **Manifest Verification**
-  - Verify upstream hash matches downloaded source
-  - Validate manifest structure
-  - Report verification status clearly
+### Key Management (Must Have)
 
-- [ ] **CLI Commands**
-  - `cerro import debian:<pkg>/<version>` - Import from Debian
-  - `cerro verify <manifest.ctp>` - Verify a manifest
-  - `cerro info <manifest.ctp>` - Display package info
+- [ ] **ct keygen** — Generate signing keypair
+  ```bash
+  ct keygen --id my-signing-key
+  ct keygen --suite CT-SIG-02  # hybrid post-quantum
+  ```
+  - Ed25519 for MVP (CT-SIG-01)
+  - Argon2id-encrypted private key
+  - Human-readable fingerprint
+
+- [ ] **ct key** — Key management subcommands
+  ```bash
+  ct key list
+  ct key import upstream.pub
+  ct key export my-key --public
+  ct key default my-key
+  ```
+
+### Trust Policy (Must Have)
+
+- [ ] **policy.json** — Trust policy file
+  - Allowed signers (glob patterns)
+  - Allowed registries
+  - Allowed crypto suites
+  - `ct verify --policy <file>` enforcement
+
+### Quality Attributes (Must Have)
+
+- [ ] **Great error messages**
+  - Specific: exactly what failed
+  - Actionable: what to do about it
+  - Contextual: bundle name, key id, etc.
+
+- [ ] **Deterministic canonicalization**
+  - Same inputs → byte-identical output
+  - Conformance test suite
+  - Per spec/manifest-canonicalization.adoc
 
 ### Should Have
 
-- [ ] **Ed25519 Signature Verification**
-  - Verify existing signatures on manifests
-  - Algorithm-agile format (future ML-DSA support)
-  - Don't need signing yet, just verification
+- [ ] **SHA-256 + Ed25519 via libsodium**
+  - Battle-tested implementation
+  - SPARK proofs deferred to v0.3
 
-- [ ] **OCI Export (Basic)**
-  - Create minimal OCI image from built package
-  - Single-layer scratch-based image
-  - Works with `podman load`
-
-- [ ] **SBOM Generation (Basic)**
-  - SPDX 2.3 JSON format
-  - Package name, version, files, license
-  - Embedded in build output
-
-- [ ] **Provenance Statement**
-  - in-toto/SLSA v1.0 format
-  - Records manifest hash, source hashes, builder
-  - Signed with build key
+- [ ] **Configuration file**
+  - ~/.config/cerro/config.toml
+  - Default policy, default key, output format
 
 ### Nice to Have
 
-- [ ] **Build Execution**
-  - Run autotools configure/make/install in Podman
-  - Capture build in staging directory
-  - Hash resulting files
+- [ ] **--json output mode** for all commands
+- [ ] **Colored terminal output** with --color=auto
 
 ---
 
 ## v0.2 — "Base Camp"
 
-**Goal:** Support multiple packages with dependencies, add post-quantum signatures
+**Goal:** Distribution commands + post-quantum signatures
 
-### Features
+### Distribution Commands
 
-- [ ] **ML-DSA-65 (Dilithium) Signatures**
-  - Add liboqs Ada bindings
-  - Hybrid Ed25519 + ML-DSA signing
-  - Post-quantum verification support
+- [ ] **ct fetch** — Pull bundle from registry or create from image
+  ```bash
+  ct fetch cerro-registry.io/nginx:1.26 -o nginx.ctp
+  ct fetch docker.io/library/nginx:1.26 -o nginx.ctp --create
+  ```
 
-- [ ] **Dependency Resolution**
-  - Parse dependency specifications
-  - Build packages in correct order
-  - Handle circular dependency detection
+- [ ] **ct push** — Publish bundle to registry/mirror
+  ```bash
+  ct push nginx.ctp cerro-registry.io/nginx:1.26
+  ct push nginx.ctp s3://my-bucket/packages/
+  ct push nginx.ctp git://github.com/org/manifests
+  ```
 
-- [ ] **Package Signing**
-  - Generate Ed25519 and ML-DSA keypairs
-  - Sign manifests as builder/maintainer
-  - Key management basics
+- [ ] **ct export / ct import** — Offline media support
+  ```bash
+  ct export nginx.ctp redis.ctp -o offline-bundle.tar
+  ct export --manifest packages.txt -o airgap.tar --include-keys
+  ct import airgap.tar --verify --policy strict.json
+  ```
 
-- [ ] **Fedora Importer**
-  - Parse RPM .spec files
-  - Download from Koji/mirrors
-  - Generate .ctp manifests
+### Post-Quantum Signatures
 
-- [ ] **Reproducibility Checking**
-  - Build same package twice
-  - Compare results bit-for-bit
-  - Report differences
+- [ ] **ML-DSA-65 (Dilithium)** via liboqs bindings
+- [ ] **CT-SIG-02** — Hybrid Ed25519 + ML-DSA-87
+- [ ] **CT-SIG-03** — Post-quantum only (ML-DSA-87)
+- [ ] Signature format already algorithm-agile from v0.1
 
-- [ ] **Transparency Log (Local)**
-  - Append-only log of operations
-  - Signed entries
-  - Foundation for federated version
+### Policy Helpers
+
+- [ ] **ct policy init** — Create starter policy interactively
+- [ ] **ct policy add-signer** — Trust a signer
+- [ ] **ct policy add-registry** — Allow a registry
 
 ---
 
 ## v0.3 — "The Wall"
 
-**Goal:** Production-ready for single operator
+**Goal:** Attestations + ecosystem integration
 
-### Features
+### Attestations
 
-- [ ] **OSTree Export**
-  - Export to OSTree repository
-  - Static delta generation
-  - Compatible with rpm-ostree
+- [ ] **SBOM generation** — SPDX 2.3 JSON in bundle
+- [ ] **SLSA provenance** — in-toto attestation format
+- [ ] **Transparency log** — Log submission + proof inclusion
+- [ ] **Threshold signatures** — FROST-Ed25519 for governance
 
-- [ ] **SELinux Policy Generation**
-  - Generate confined policies for packages
-  - CIL format output
-  - Basic policy templates
+### Ecosystem
 
-- [ ] **Alpine Importer**
-  - Parse APKBUILD files
-  - Support aports repository
+- [ ] **SELinux policy** — CIL policy generation
+- [ ] **OSTree export** — Compatible with rpm-ostree
+- [ ] **Svalinn integration** — Per spec/svalinn-integration.adoc
 
-- [ ] **Enhanced SBOM**
-  - CycloneDX format (in addition to SPDX)
-  - Vulnerability correlation
-  - Dependency tree visualization
+### Quality
 
-- [ ] **Web UI (Read-Only)**
-  - Browse packages
-  - View provenance chains
-  - Verify signatures online
-
-- [ ] **Ed25519 Deprecation Evaluation**
-  - Assess quantum threat timeline
-  - Plan transition to ML-DSA-only if appropriate
+- [ ] **SPARK proofs** for crypto module
+- [ ] **Security audit** of core code
 
 ---
 
 ## v0.4 — "The Summit"
 
-**Goal:** Federated operation, multiple operators
+**Goal:** Federated operation, build verification
 
-### Features
+### Build Flow (Separate from Pack)
 
-- [ ] **Federated Transparency Log**
-  - Multiple witnesses
-  - Consistency verification
-  - Gossip protocol
+- [ ] **Debian importer** — Import from Debian source packages
+  ```bash
+  ct import debian:nginx/1.26.0-1 -o nginx.ctp
+  ```
+- [ ] **Fedora importer** — Import from SRPMs
+- [ ] **Alpine importer** — Import from APKBUILDs
 
-- [ ] **Multi-Operator Build Verification**
-  - Multiple builders produce same output
-  - Consensus on build results
-  - Detect compromised builders
+### Federation
 
-- [ ] **Mirror Support**
-  - Pull from upstream Cerro Torre
-  - Serve local mirror
-  - Delta synchronisation
-
-- [ ] **Vulnerability Tracking**
-  - CVE database integration
-  - Affected package identification
-  - Advisory generation
+- [ ] **Federated transparency log** — Multiple witnesses
+- [ ] **Multi-builder verification** — Consensus on builds
+- [ ] **Mirror support** — Delta synchronization
 
 ---
 
 ## Future / Wishlist
 
-- **Nix Importer** - Import from nixpkgs
-- **Arch Importer** - Import from PKGBUILD
-- **Bootable Images** - Full bootable system images
-- **Secure Boot Integration** - Sign boot components
-- **Hardware Attestation** - TPM-based attestation
-- **Mobile Support** - Android/iOS package verification
+- **Nix Importer** — Import from nixpkgs
+- **Bootable Images** — Full bootable system images
+- **Secure Boot Integration** — Sign boot components
+- **Hardware Attestation** — TPM-based attestation
+- **Mobile Verification** — Verify on Android/iOS
 
 ---
 
-## Non-Goals (For Now)
+## Non-Goals
 
-- **GUI Application** - CLI-first, web UI for viewing only
-- **Windows Support** - Linux containers and immutable Linux only
-- **Binary Package Management** - We verify, distributions distribute
-- **Real-Time Updates** - Batch verification, not continuous
+- **GUI Application** — CLI-first, web UI for viewing only
+- **Windows Support** — Linux containers and immutable Linux only
+- **Binary Package Management** — We verify, distributions distribute
+- **Build execution in v0.1** — Pack existing images first, build-from-source later
 
 ---
 
 ## Success Metrics
 
-### MVP Success
-- [ ] Import GNU Hello from Debian
-- [ ] Build with provenance tracking
-- [ ] Export working OCI image
-- [ ] Verify all hashes match
+### MVP v0.1 Success
+- [ ] `ct pack` + `ct verify` + `ct explain` work end-to-end
+- [ ] Error messages are specific and actionable
+- [ ] Key generation and verification work
+- [ ] Canonicalization conformance tests pass
 - [ ] Documentation complete enough for others to try
 
 ### v0.2 Success
-- [ ] 10+ packages building successfully
+- [ ] Offline export/import works for airgapped environments
+- [ ] Post-quantum signatures work (CT-SIG-02)
 - [ ] At least one external contributor
-- [ ] Reproducibility rate >80%
 
 ### v0.3 Success
+- [ ] SBOM + provenance in every bundle
 - [ ] Used in at least one production deployment
-- [ ] Security audit of core crypto code
-- [ ] SPARK proofs complete for crypto module
+- [ ] Security audit complete
 
 ### v0.4 Success
 - [ ] Multiple independent operators
 - [ ] Transparency log with >2 witnesses
-- [ ] Governance transition to full cooperative
+- [ ] Debian/Fedora import working

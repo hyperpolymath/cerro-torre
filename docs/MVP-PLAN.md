@@ -1,26 +1,36 @@
 # Cerro Torre MVP Plan
 
 **Version**: 0.1.0-mvp
-**Last Updated**: 2025-12-28
+**Last Updated**: 2025-12-29
 **Status**: Draft
 
 ## Executive Summary
 
-The MVP demonstrates Cerro Torre's core thesis: **provenance-verified containers from democratically-governed sources**.
+Cerro Torre is "**ship containers safely**" — the distribution complement to Svalinn's "run containers nicely".
 
-MVP ≠ a whole distro. MVP = one repeatable end-to-end pipeline that:
-1. Takes a `.ctp` manifest
-2. Produces a runnable OCI container image
-3. Emits verifiable provenance attestations
+A user should be able to:
+1. **Wrap** an OCI image into a verifiable bundle (`.ctp`)
+2. **Move** that bundle around (offline, airgapped, mirrors)
+3. **Verify** it deterministically
+4. **Install/run** it with minimal ceremony
 
-### Success Command
+MVP ≠ a whole distro. MVP = ergonomic CLI for pack/verify/explain with great errors.
+
+### Success Commands
 
 ```bash
-cerro import debian:hello/2.10-3
-cerro build manifests/hello.ctp
-cerro export --format=oci hello:2.10-3
-podman run cerro-torre/hello:2.10-3
-# Output: Hello, world!
+# Pack an OCI image into a verifiable bundle
+ct pack docker.io/library/nginx:1.26 -o nginx.ctp
+
+# Verify the bundle (with clear, actionable errors)
+ct verify nginx.ctp
+
+# Explain the verification chain in human terms
+ct explain nginx.ctp
+
+# Key management
+ct keygen --id my-key
+ct key list
 ```
 
 ---
@@ -29,330 +39,363 @@ podman run cerro-torre/hello:2.10-3
 
 | Criterion | Description | Verification |
 |-----------|-------------|--------------|
-| **E2E Build** | Single command builds from manifest to OCI image | `cerro build manifests/hello.ctp` succeeds |
-| **Provenance Bundle** | SBOM + in-toto attestation + signed digests produced | Files exist in `dist/<build-id>/` |
-| **Signature Verification** | Output attestations are cryptographically signed | `cerro verify dist/<build-id>/` passes |
-| **Runnable Container** | Exported OCI image runs in Podman | `podman run` produces expected output |
-| **Reproducibility Hook** | Build records all inputs; same inputs → same output hash | Rebuild produces identical digest |
+| **One-command pack** | Wrap OCI image into verifiable .ctp | `ct pack nginx:1.26 -o nginx.ctp` succeeds |
+| **One-command verify** | Verify bundle with clear pass/fail | `ct verify nginx.ctp` returns 0 or specific error code |
+| **Great errors** | Specific, actionable error messages | Hash mismatch vs signature vs key vs policy distinct |
+| **Human explanation** | Verification chain readable by humans | `ct explain nginx.ctp` shows trust chain |
+| **Key management** | Generate, list, import keys | `ct keygen`, `ct key list` work |
+| **Policy support** | Trust policy file for verification | `ct verify --policy policy.json` works |
+| **Deterministic output** | Same inputs → byte-identical .ctp | Canonicalization conformance tests pass |
 
 ---
 
 ## Implementation Stages
 
-### Stage 0: Contract Definition (1 day)
+### Stage 0: CLI Foundation + Contracts (2 days)
 
-**Goal**: Pin down the minimum .ctp manifest and output format before writing code.
+**Goal**: Establish CLI structure and pin down bundle format before implementing logic.
 
 #### Deliverables
 
-1. **Minimal Manifest Schema** (`spec/mvp-manifest.md`)
-   ```toml
-   [metadata]
-   name = "hello"
-   version = "2.10-3"
+1. **CLI Skeleton** (`src/cli/`)
+   - Command parser with subcommands: `pack`, `verify`, `explain`, `keygen`, `key`
+   - Help text for all commands
+   - Exit code constants (see Error Taxonomy)
+   - Output formatting (text/JSON modes)
 
-   [provenance]
-   upstream = "debian"
-   source = "http://deb.debian.org/debian/pool/main/h/hello/hello_2.10.orig.tar.gz"
-   source_hash = "sha256:31e066137a962676e89f69d1b65382de95a7ef7d914b8cb956f41ea72e0f516b"
-   dsc = "http://deb.debian.org/debian/pool/main/h/hello/hello_2.10-3.dsc"
-   dsc_hash = "sha256:..."
-
-   [build]
-   system = "autoconf"
-   configure_flags = ["--prefix=/usr"]
-
-   [outputs]
-   binary = ["hello"]
+2. **Bundle Format** (`.ctp` file)
+   ```
+   <name>.ctp                    # Single-file bundle
+   ├── manifest.toml             # Embedded TOML manifest
+   ├── summary.json              # Hash-stable build summary
+   └── signatures/               # Detached signatures
+       └── <keyid>.sig
    ```
 
-2. **Output Directory Structure**
+   Or as a directory (for large images):
    ```
-   dist/<build-id>/
-   ├── image.tar              # OCI image tarball
-   ├── canonical.ctp          # Canonicalized manifest
-   ├── summary.json           # Build summary with digests
-   ├── sbom.spdx.json         # SPDX SBOM
-   ├── provenance.jsonl       # in-toto attestation (DSSE envelope)
-   ├── digests.txt            # SHA256 of all outputs
-   └── signatures.json        # Algorithm-agile signatures
+   <name>.ctp/
+   ├── manifest.toml
+   ├── summary.json
+   ├── signatures/
+   ├── blobs/                    # Content-addressed blobs
+   │   └── sha256/
+   └── oci-layout               # Optional OCI image
    ```
 
-   **signatures.json format** (algorithm-agile from day 1):
+3. **Error Taxonomy** (exit codes)
+
+   | Code | Name | Description |
+   |------|------|-------------|
+   | 0 | SUCCESS | Operation completed |
+   | 1 | HASH_MISMATCH | Content tampered or corrupted |
+   | 2 | SIGNATURE_INVALID | Signature doesn't verify |
+   | 3 | KEY_NOT_TRUSTED | Signer not in policy |
+   | 4 | POLICY_REJECTION | Registry/base not allowed |
+   | 5 | MISSING_ATTESTATION | Required attestation absent |
+   | 10 | MALFORMED_BUNDLE | Invalid structure or format |
+   | 11 | IO_ERROR | File not found, permission denied |
+   | 12 | NETWORK_ERROR | Registry unreachable |
+
+4. **Policy File Format** (`policy.json`)
    ```json
    {
-     "payload_type": "application/vnd.cerro-torre.digests+txt",
-     "payload_digest": "sha256:...",
-     "signatures": [
-       {"algorithm": "ed25519", "keyid": "dev-key-2025", "sig": "base64..."}
-     ]
+     "version": "1",
+     "signers": { "allowed": ["cerro-*"], "threshold": 1 },
+     "registries": { "allowed": ["docker.io/*"], "blocked": [] },
+     "suites": { "allowed": ["CT-SIG-01", "CT-SIG-02"] }
    }
    ```
 
-3. **Error Taxonomy**
-   - `MANIFEST_INVALID` - Parse or validation failure
-   - `FETCH_FAILED` - Network/download error
-   - `HASH_MISMATCH` - Integrity verification failed
-   - `BUILD_FAILED` - Compilation/packaging error
-   - `ATTESTATION_FAILED` - Provenance generation error
-
-#### Seam Invariants (must hold true)
+#### Seam Invariants
 
 | Seam | Invariant |
 |------|-----------|
-| Manifest → Plan | Same manifest + same inputs = same build plan |
-| Inputs → Attestations | Every influencing byte is hashed and recorded |
-| Outputs → OCI | Image digest in provenance = actual produced digest |
-| Keys → Trust | Signatures verifiable with documented trust root |
+| Pack → Verify | `ct verify (ct pack X)` always succeeds |
+| Same inputs → Same output | Deterministic canonicalization |
+| Error → Message | Every exit code has actionable error text |
+| Offline → Works | All operations work without network (given cached content) |
 
 ---
 
-### Stage 1: Core Pipeline (5-7 days)
+### Stage 1: Pack + Verify Core (5-7 days)
 
-**Goal**: Implement the fetch → verify → build → pack pipeline for one Debian package.
+**Goal**: Implement `ct pack` and `ct verify` with great errors.
 
-#### 1.1 TOML Parser Integration (Day 1)
-
-**File**: `src/core/cerro_manifest.adb`
-
-- Integrate `toml_slicer` Alire dependency
-- Implement `Parse_String` and `Parse_File` functions
-- Map TOML sections to existing Ada record types
-- Add validation against manifest schema
-
-**Acceptance**: Parse `manifests/hello.ctp` without errors
-
-#### 1.2 Cryptographic Operations (Day 1-2)
+#### 1.1 Cryptographic Operations (Day 1-2)
 
 **File**: `src/core/cerro_crypto.adb`
-
-Two options (decide now):
 
 | Option | Pros | Cons |
 |--------|------|------|
 | **libsodium bindings** | Battle-tested, fast | External C dependency |
 | **Pure Ada (SPARKNaCl)** | No C, fully provable | Less mature, more work |
 
-**MVP Recommendation**: Use libsodium bindings for SHA256/Ed25519. SPARK proofs can wrap the calls later.
+**MVP Recommendation**: libsodium bindings for SHA256/Ed25519.
 
-- Implement `SHA256_Hash` using libsodium
-- Implement `SHA256_Verify` (compare computed vs expected)
+- Implement `SHA256_Hash` and `SHA256_File`
 - Implement `Ed25519_Sign` and `Ed25519_Verify`
-- Keep existing constant-time comparison for digest comparison
+- Constant-time comparison for digests
 
-**Acceptance**: Hash a test string, verify signature round-trip
+**Acceptance**: Hash a file, sign/verify round-trip
 
-#### 1.3 Source Fetcher (Day 2-3)
+#### 1.2 OCI Image Reading (Day 2-3)
 
-**File**: `src/importers/debian/cerro_debian_fetch.ads/adb` (new)
+**File**: `src/oci/cerro_oci_read.ads/adb` (new)
 
-- HTTP client using AWS (Ada Web Server)
-- Download `.dsc` file and parse it
-- Download `.orig.tar.gz` and `.debian.tar.xz`
-- Verify SHA256 checksums match `.dsc` declarations
-- Extract to `work/<package>-<version>/`
+- Read OCI image from local tarball or directory
+- Read from registry via `skopeo copy` (shell out for MVP)
+- Extract manifest, config, layer digests
+- Compute content digests for verification
 
-**Note**: For MVP, skip Debian signature verification (InRelease chain). Record that it was skipped in attestation.
+**Acceptance**: `ct pack oci:./test-image -o test.ctp` extracts image metadata
 
-**Acceptance**: `cerro fetch debian:hello/2.10-3` downloads and verifies hello sources
+#### 1.3 Bundle Writer (Day 3-4)
 
-#### 1.4 Build Executor (Day 3-4)
+**File**: `src/bundle/cerro_bundle_write.ads/adb` (new)
 
-**File**: `src/build/cerro_builder.adb`
+- Generate canonical `manifest.toml` from OCI image
+- Generate `summary.json` with all digests
+- Apply canonicalization rules (per `spec/manifest-canonicalization.adoc`)
+- Write bundle as single file or directory
 
-MVP approach: **Wrapper around existing tools**, not replacement.
-
-- Create hermetic build environment (Podman container with Debian base)
-- Mount source directory into container
-- Execute standard autoconf sequence: `./configure && make && make install DESTDIR=...`
-- Capture build log for attestation
-- Copy installed files to staging directory
-
-**Build Environment Image**:
-```dockerfile
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y build-essential autoconf automake
+**Bundle structure**:
+```
+nginx.ctp
+├── manifest.toml      # Canonical TOML
+├── summary.json       # Hash-stable summary
+├── blobs/sha256/...   # Content blobs (optional)
+└── signatures/        # Signature files
 ```
 
-**Acceptance**: Build hello from downloaded sources, produce `/usr/bin/hello`
+**Acceptance**: `ct pack` produces valid bundle structure
 
-#### 1.5 OCI Packer (Day 4-5)
+#### 1.4 Bundle Verifier (Day 4-5)
 
-**File**: `src/exporters/oci/cerro_oci.ads/adb` (new)
+**File**: `src/bundle/cerro_bundle_verify.ads/adb` (new)
 
-- Create minimal OCI image layout:
-  ```
-  blobs/sha256/<layer-digest>    # Tarball of rootfs
-  blobs/sha256/<config-digest>   # Image config JSON
-  blobs/sha256/<manifest-digest> # Image manifest JSON
-  index.json                     # OCI image index
-  oci-layout                     # {"imageLayoutVersion": "1.0.0"}
-  ```
-- Generate layer tarball from staging directory
-- Create config with entrypoint, environment, labels
-- Create manifest linking config + layers
-- Write index.json pointing to manifest
+- Read and parse bundle
+- Verify all content hashes match summary
+- Verify signatures against policy
+- Return specific exit codes for each failure type
 
-**Acceptance**: `podman load < image.tar` works, `podman run` executes hello
+**Error output format**:
+```
+✗ Verification failed: signature invalid
+
+  Bundle:    nginx.ctp
+  Signer:    unknown-key-2025
+  Algorithm: ed25519
+
+  The signature does not match the manifest content.
+
+  To see expected signers: ct explain nginx.ctp --signers
+```
+
+**Acceptance**: `ct verify` returns correct exit code for each error type
+
+#### 1.5 Explain Command (Day 5)
+
+**File**: `src/cli/cerro_explain.ads/adb` (new)
+
+- Parse bundle without verification
+- Print human-readable verification chain
+- Show package info, provenance, content hashes, signatures, trust chain
+
+**Acceptance**: `ct explain bundle.ctp` prints readable output
 
 ---
 
-### Stage 2: Attestations (2-3 days)
+### Stage 2: Key Management + Policy (2-3 days)
 
-**Goal**: Emit provenance artifacts that prove "supply-chain verified."
+**Goal**: Minimal key UX and trust policy support.
 
-#### 2.1 SBOM Generation (Day 1)
+#### 2.1 Key Generation (Day 1)
 
-**File**: `src/attestations/cerro_sbom.ads/adb` (new)
+**File**: `src/keystore/cerro_keygen.ads/adb` (new)
 
-- Generate SPDX 2.3 JSON format
-- Include:
-  - Package name, version, supplier (Cerro Torre)
-  - Files with checksums
-  - Upstream source URL
-  - License (from manifest or detected)
-- Use SPDX-License-Identifier: GPL-3.0-or-later for hello
+- Generate Ed25519 keypair
+- Encrypt private key with Argon2id (per `spec/keystore-policy.json`)
+- Store in `~/.config/cerro/keys/`
+- Generate human-readable fingerprint
 
-**Acceptance**: `sbom.spdx.json` validates against SPDX schema
+**Command**: `ct keygen --id my-key`
 
-#### 2.2 Provenance Statement (Day 1-2)
+**Output**:
+```
+Generated keypair: my-key
 
-**File**: `src/attestations/cerro_provenance_emit.ads/adb` (new)
+  Public key:  ~/.config/cerro/keys/my-key.pub
+  Private key: ~/.config/cerro/keys/my-key.key (encrypted)
 
-- Emit in-toto/SLSA v1.0 provenance format
-- Include:
-  ```json
-  {
-    "_type": "https://in-toto.io/Statement/v1",
-    "subject": [{"name": "hello:2.10-3", "digest": {"sha256": "..."}}],
-    "predicateType": "https://slsa.dev/provenance/v1",
-    "predicate": {
-      "buildDefinition": {
-        "buildType": "https://cerro-torre.org/build/v1",
-        "externalParameters": {"manifest": "sha256:..."},
-        "internalParameters": {},
-        "resolvedDependencies": [...]
-      },
-      "runDetails": {
-        "builder": {"id": "cerro-torre/builder:0.1.0"},
-        "metadata": {"invocationId": "...", "startedOn": "...", "finishedOn": "..."}
-      }
-    }
-  }
-  ```
+  Fingerprint: SHA256:abc123def456...
+  Algorithm:   ed25519 (CT-SIG-01)
+```
 
-**Acceptance**: Provenance JSON validates against in-toto schema
+**Acceptance**: `ct keygen` creates working keypair
 
-#### 2.3 Signing (Day 2)
+#### 2.2 Key Management (Day 1-2)
 
-**File**: `src/attestations/cerro_signer.ads/adb` (new)
+**File**: `src/keystore/cerro_keystore.ads/adb` (new)
 
-- Create `digests.txt` with SHA256 of all outputs
-- Sign digests using Ed25519 key from `keys/`
-- Output DSSE envelope or detached `.sig` file
-- For MVP, use development key (document trust root)
+- `ct key list` - Show all keys with fingerprints
+- `ct key import <file>` - Import public key
+- `ct key export <id> --public` - Export public key
+- `ct key default <id>` - Set default signing key
 
-**Acceptance**: `cerro verify dist/<build-id>/` passes signature check
+**Key listing format**:
+```
+Keys in ~/.config/cerro/keys/
+
+  ID              TYPE      SUITE      DEFAULT
+  my-key          keypair   CT-SIG-01  ✓
+  upstream-nginx  public    CT-SIG-01
+```
+
+**Acceptance**: All key subcommands work
+
+#### 2.3 Policy Support (Day 2)
+
+**File**: `src/policy/cerro_policy.ads/adb` (new)
+
+- Read `policy.json` from `--policy` or `~/.config/cerro/policy.json`
+- Evaluate signer trust (glob matching)
+- Evaluate registry allowlist/blocklist
+- Evaluate suite restrictions
+
+**Minimal starter policy**:
+```json
+{
+  "version": "1",
+  "signers": { "allowed": ["*"], "threshold": 1 },
+  "registries": { "allowed": ["*"] },
+  "suites": { "allowed": ["CT-SIG-01"] }
+}
+```
+
+**Acceptance**: `ct verify --policy strict.json` enforces policy
+
+#### 2.4 Signing Integration (Day 2-3)
+
+**Update**: `src/bundle/cerro_bundle_write.adb`
+
+- Sign summary.json with selected key
+- Write signature to `signatures/<keyid>.sig`
+- Include suite_id in signature metadata
+
+**Acceptance**: `ct pack -k my-key` produces signed bundle
 
 ---
 
-### Stage 3: Integration & Testing (2-3 days)
+### Stage 3: Testing + Polish (2-3 days)
 
-**Goal**: Wire everything together, add tests, document.
+**Goal**: Conformance tests, error message polish, documentation.
 
-#### 3.1 CLI Integration (Day 1)
+#### 3.1 Canonicalization Conformance (Day 1)
 
-**File**: `src/cli/cerro_cli.adb`
+**Directory**: `tests/canon/`
 
-Implement command handlers:
+Per `spec/manifest-canonicalization.adoc`:
 
-```
-cerro import debian:<pkg>/<version>  # Fetch + parse → generate .ctp
-cerro build <manifest.ctp>           # Full pipeline → dist/
-cerro verify <build-dir>             # Check signatures + hashes
-cerro export --format=oci <image>    # (integrated in build for MVP)
-cerro inspect <manifest.ctp>         # Show parsed manifest
-```
+- **Valid cases**: inputs that must canonicalize identically
+- **Invalid cases**: inputs that must be rejected
+- **Idempotence**: `canonicalize(canonicalize(x)) == canonicalize(x)`
 
-#### 3.2 Test Suite (Day 1-2)
+Test runner compares Ada output against golden files.
 
-**Directory**: `tests/`
+**Shadow Verifier** (non-authoritative):
+- ATS2 at `tools/ats-shadow/` cross-checks canonicalization
+- Checks: LF-only, no TAB, no trailing whitespace, key ordering
+- CI runs but `allow_failure: true`
 
-- **Unit tests** (AUnit):
-  - Manifest parsing (valid/invalid inputs)
-  - Hash computation
-  - Version comparison
+#### 3.2 Error Message Testing (Day 1-2)
 
-- **Integration tests**:
-  - End-to-end build of hello.ctp
-  - Verify provenance chain
-  - Run container and check output
+**Directory**: `tests/errors/`
 
-- **Shadow Verifier** (non-authoritative, CI-only):
-  - ATS2 tool at `tools/ats-shadow/` provides independent verification
-  - Checks: LF-only, no TAB, no trailing whitespace, key ordering
-  - Optional: digest coupling (`--check-digest`), idempotence (`--check-idempotence`)
-  - Different implementation language = different bugs (defense in depth)
+For each error code, verify:
+- Correct exit code returned
+- Message is specific (what failed)
+- Message is actionable (what to do)
+- Context included (bundle name, key id, etc.)
 
-- **CI Pipeline** (`.gitlab-ci.yml`):
-  ```yaml
-  stages:
-    - build
-    - test
-    - shadow
-    - integration
+**Test cases**:
+- Hash mismatch (tampered content)
+- Signature invalid (wrong key)
+- Key not trusted (not in policy)
+- Policy rejection (registry blocked)
+- Malformed bundle (bad TOML)
 
-  build:
-    script:
-      - alr build
+#### 3.3 Integration Tests (Day 2)
 
-  test:
-    script:
-      - alr run cerro_tests
+**Directory**: `tests/integration/`
 
-  shadow-verify:
-    stage: shadow
-    script:
-      - patscc -O2 -DATS_MEMALLOC_LIBC -o ct-shadow tools/ats-shadow/main.dats
-      - ./ct-shadow --summary dist/summary.json --check-digest dist/canonical.ctp
-    allow_failure: true  # Non-authoritative
+End-to-end scenarios:
+1. `ct pack` → `ct verify` → `ct explain` round-trip
+2. Pack unsigned → sign later → verify
+3. Verify against permissive vs strict policy
+4. Key generation → sign → verify with imported key
 
-  integration:
-    script:
-      - ./scripts/build-demo.sh
-      - ./scripts/verify-demo.sh
-  ```
-
-#### 3.3 Documentation (Day 2)
+#### 3.4 Documentation (Day 2-3)
 
 - Update `README.adoc` with quick start
-- Add `docs/USAGE.md` with command reference
-- Document trust model in `docs/TRUST.md`
-- Add `CHANGELOG.md` entry for v0.1.0
+- `docs/CLI.md` - Command reference (or generate from `--help`)
+- `docs/POLICY.md` - Trust policy format and examples
+- `CHANGELOG.md` entry for v0.1.0
+
+**CI Pipeline** (`.gitlab-ci.yml`):
+```yaml
+stages: [build, test, shadow, integration]
+
+build:
+  script: alr build
+
+test:
+  script: alr exec -- cerro_tests
+
+shadow-verify:
+  stage: shadow
+  script:
+    - patscc -O2 -DATS_MEMALLOC_LIBC -o ct-shadow tools/ats-shadow/main.dats
+    - ./ct-shadow --check-all tests/canon/
+  allow_failure: true
+
+integration:
+  script: ./scripts/test-e2e.sh
+```
 
 ---
 
 ## What to Defer (Post-MVP)
 
-### SHOULD (v0.2)
+### v0.2: Distribution Commands
+
+| Feature | Description |
+|---------|-------------|
+| `ct fetch` | Pull .ctp from registry or create from OCI image |
+| `ct push` | Publish .ctp to registry/mirror/object store |
+| `ct export` / `ct import` | Offline media support (airgap) |
+| `ct policy init` | Interactive policy creation |
+| ML-DSA-65 (Dilithium) | Post-quantum signatures via liboqs |
+| Hybrid signatures | Ed25519 + ML-DSA-87 together |
+
+### v0.3: Attestations + Ecosystem
+
+| Feature | Description |
+|---------|-------------|
+| SBOM generation | SPDX 2.3 JSON in bundle |
+| SLSA provenance | in-toto attestation format |
+| Transparency log | Log submission + proof inclusion |
+| Threshold signatures | FROST-Ed25519 for governance |
+| SELinux policy | CIL policy generation |
+
+### Future
 
 | Feature | Reason to Defer |
 |---------|-----------------|
-| ML-DSA-65 (Dilithium) signatures | Needs liboqs Ada bindings |
-| Debian signature chain (InRelease) | Complex PKI, not blocking demo |
-| Reproducible builds enforcement | Requires tooling integration |
-| Transparency log integration | Needs protocol finalization |
-| Fedora/Alpine importers | Debian sufficient for demo |
-| SELinux policy generation | Advanced feature |
-
-### COULD (v0.3+)
-
-| Feature | Reason to Defer |
-|---------|-----------------|
-| SPARK proofs for crypto | Correctness first, proofs later |
-| Manifest language verification | Research topic |
-| Multi-package builds | Complexity explosion |
-| Cooperative governance automation | Organizational, not technical |
+| Debian importer | Build-from-source flow (separate from pack) |
+| Fedora/Alpine importers | Multi-distro support |
+| SPARK proofs | Correctness first, proofs later |
+| Cooperative governance | Organizational, not technical |
 
 ---
 
@@ -450,18 +493,21 @@ This ensures attestations signed today can be verified even after quantum comput
 
 ```
 Week 1:
-├── Day 1: Stage 0 (Contract) + TOML parser
-├── Day 2: Crypto operations
-├── Day 3: Source fetcher
-├── Day 4: Build executor
-└── Day 5: OCI packer
+├── Day 1-2: Stage 0 (CLI skeleton, bundle format, error taxonomy)
+├── Day 2-3: Crypto operations (SHA256, Ed25519)
+├── Day 3-4: OCI image reading (skopeo integration)
+├── Day 4-5: Bundle writer (manifest.toml, summary.json, canonicalization)
+└── Day 5:   Bundle verifier (hash checks, signature verification)
 
 Week 2:
-├── Day 1: SBOM generation
-├── Day 2: Provenance statement + signing
-├── Day 3: CLI integration
-├── Day 4: Test suite
-└── Day 5: Documentation + release
+├── Day 1:   ct explain command
+├── Day 1-2: Key generation (ct keygen)
+├── Day 2:   Key management (ct key list/import/export)
+├── Day 2-3: Policy support (policy.json parsing, evaluation)
+├── Day 3:   Signing integration (ct pack -k)
+├── Day 4:   Canonicalization conformance tests
+├── Day 4-5: Error message testing
+└── Day 5:   Documentation + release
 ```
 
 ---
@@ -472,37 +518,34 @@ Week 2:
 
 | Path | Purpose |
 |------|---------|
-| `src/importers/debian/cerro_debian_fetch.ads` | Debian source fetcher spec |
-| `src/importers/debian/cerro_debian_fetch.adb` | Debian source fetcher body |
-| `src/exporters/oci/cerro_oci.ads` | OCI packer spec |
-| `src/exporters/oci/cerro_oci.adb` | OCI packer body |
-| `src/attestations/cerro_sbom.ads` | SBOM generator spec |
-| `src/attestations/cerro_sbom.adb` | SBOM generator body |
-| `src/attestations/cerro_provenance_emit.ads` | Provenance emitter spec |
-| `src/attestations/cerro_provenance_emit.adb` | Provenance emitter body |
-| `src/attestations/cerro_signer.ads` | Signing operations spec |
-| `src/attestations/cerro_signer.adb` | Signing operations body |
-| `manifests/hello.ctp` | GNU Hello manifest (from example) |
-| `keys/dev-key.pub` | Development signing key |
-| `tests/test_manifest.adb` | Manifest parser tests |
-| `tests/test_crypto.adb` | Crypto operation tests |
-| `scripts/build-demo.sh` | Demo build script |
-| `scripts/verify-demo.sh` | Demo verification script |
+| `src/cli/ct_pack.ads/adb` | Pack command implementation |
+| `src/cli/ct_verify.ads/adb` | Verify command implementation |
+| `src/cli/ct_explain.ads/adb` | Explain command implementation |
+| `src/cli/ct_keygen.ads/adb` | Keygen command implementation |
+| `src/cli/ct_key.ads/adb` | Key management subcommands |
+| `src/cli/ct_errors.ads` | Exit codes and error formatting |
+| `src/oci/cerro_oci_read.ads/adb` | OCI image reading |
+| `src/bundle/cerro_bundle_write.ads/adb` | Bundle writer |
+| `src/bundle/cerro_bundle_verify.ads/adb` | Bundle verifier |
+| `src/bundle/cerro_canon.ads/adb` | Canonicalization |
+| `src/keystore/cerro_keygen.ads/adb` | Key generation |
+| `src/keystore/cerro_keystore.ads/adb` | Key storage and management |
+| `src/policy/cerro_policy.ads/adb` | Policy parsing and evaluation |
+| `tests/canon/` | Canonicalization conformance tests |
+| `tests/errors/` | Error message tests |
 | `.gitlab-ci.yml` | CI pipeline |
-| `docs/USAGE.md` | Command reference |
-| `docs/TRUST.md` | Trust model documentation |
-| `tools/ats-shadow/README.adoc` | Shadow verifier documentation |
-| `tools/ats-shadow/main.dats` | ATS2 shadow verifier (non-authoritative) |
+| `docs/CLI.md` | Command reference |
+| `docs/POLICY.md` | Policy format documentation |
+| `examples/policy.json` | Starter policy file |
 
 ### Modified Files
 
 | Path | Changes |
 |------|---------|
 | `src/core/cerro_crypto.adb` | Implement SHA256, Ed25519 with libsodium |
-| `src/core/cerro_manifest.adb` | Implement TOML parsing |
-| `src/build/cerro_builder.adb` | Implement build orchestration |
-| `src/cli/cerro_cli.adb` | Implement command handlers |
-| `alire.toml` | Add aws, libsodium dependencies |
+| `src/cli/cerro_cli.adb` | Command dispatcher for pack/verify/explain/keygen/key |
+| `src/cli/cerro_main.adb` | Entry point with argument parsing |
+| `alire.toml` | Add libsodium dependency |
 | `README.adoc` | Add quick start |
 
 ---
@@ -512,10 +555,10 @@ Week 2:
 | Risk | Mitigation |
 |------|------------|
 | libsodium binding issues | Fall back to shelling out to `sha256sum`, `signify` |
-| Podman unavailable in CI | Use container-in-container or remote builder |
-| Debian package complexity | Start with hello, it's intentionally simple |
+| skopeo unavailable | Document as prerequisite, provide install instructions |
 | TOML parser edge cases | Use minimal subset, validate strictly |
-| Time overrun | Cut SBOM/provenance detail before cutting E2E |
+| Error messages unclear | User testing + iterate on messages |
+| Time overrun | Cut key import/export before cutting pack/verify |
 
 ---
 
@@ -523,62 +566,80 @@ Week 2:
 
 MVP is complete when:
 
-- [ ] `alr build` produces `cerro` binary
-- [ ] `cerro build manifests/hello.ctp` produces OCI image + attestations
-- [ ] `podman run` on produced image outputs "Hello, world!"
-- [ ] `cerro verify dist/<build-id>/` passes
+- [ ] `alr build` produces `ct` binary
+- [ ] `ct pack nginx:1.26 -o nginx.ctp` creates valid bundle
+- [ ] `ct verify nginx.ctp` returns 0 for valid bundle
+- [ ] `ct verify tampered.ctp` returns specific error code
+- [ ] `ct explain nginx.ctp` prints human-readable chain
+- [ ] `ct keygen --id test` creates working keypair
+- [ ] `ct key list` shows keys with fingerprints
+- [ ] Error messages are specific and actionable
+- [ ] Canonicalization conformance tests pass
 - [ ] CI pipeline passes all tests
 - [ ] README documents quick start
 - [ ] CHANGELOG has v0.1.0 entry
 
 ---
 
-## Appendix: hello.ctp Reference Manifest
+## Appendix A: Sample ct verify Error Output
 
-```toml
-# Cerro Torre Package Manifest
-# Format: CTP 0.1.0
+```
+✗ Verification failed: hash mismatch
 
-[metadata]
-name = "hello"
-version = "2.10-3"
-summary = "GNU Hello - example package"
-description = "Classic GNU Hello program, used to demonstrate the Cerro Torre build system."
-license = "GPL-3.0-or-later"
-homepage = "https://www.gnu.org/software/hello/"
-maintainer = "Cerro Torre Collective <maintainers@cerro-torre.org>"
+  Bundle:     nginx.ctp
+  Layer:      blobs/sha256/a1b2c3...
+  Expected:   sha256:a1b2c3d4e5f6...
+  Actual:     sha256:deadbeef1234...
 
-[provenance]
-upstream = "debian"
-upstream_version = "2.10"
-source_url = "http://ftp.gnu.org/gnu/hello/hello-2.10.tar.gz"
-source_hash = "sha256:31e066137a962676e89f69d1b65382de95a7ef7d914b8cb956f41ea72e0f516b"
-import_date = "2025-01-15"
+  The layer content has been modified or corrupted.
+  This may indicate tampering during transfer.
 
-[provenance.debian]
-dsc_url = "http://deb.debian.org/debian/pool/main/h/hello/hello_2.10-3.dsc"
-dsc_hash = "sha256:TO_BE_FILLED"
-orig_url = "http://deb.debian.org/debian/pool/main/h/hello/hello_2.10.orig.tar.gz"
-orig_hash = "sha256:31e066137a962676e89f69d1b65382de95a7ef7d914b8cb956f41ea72e0f516b"
-debian_url = "http://deb.debian.org/debian/pool/main/h/hello/hello_2.10-3.debian.tar.xz"
-debian_hash = "sha256:TO_BE_FILLED"
+  To inspect the bundle: ct explain nginx.ctp --layers
+```
 
-[build]
-system = "autoconf"
-configure_flags = ["--prefix=/usr"]
-build_dependencies = ["build-essential", "autoconf", "automake", "texinfo"]
+```
+✗ Verification failed: key not trusted
 
-[build.phases]
-configure = { run = "./configure --prefix=/usr" }
-build = { run = "make" }
-install = { run = "make install DESTDIR=${DESTDIR}" }
+  Bundle:     nginx.ctp
+  Signer:     suspicious-key-2025
+  Fingerprint: SHA256:xyz789...
 
-[outputs]
-binaries = ["/usr/bin/hello"]
-documentation = ["/usr/share/doc/hello/", "/usr/share/info/hello.info", "/usr/share/man/man1/hello.1"]
+  This key is not in your trust policy.
 
-[attestations]
-sbom = true
-slsa_provenance = true
-sign = true
+  To trust this signer:
+    ct key import suspicious-key-2025.pub --trust
+
+  To see your policy: cat ~/.config/cerro/policy.json
+```
+
+---
+
+## Appendix B: Sample policy.json
+
+```json
+{
+  "version": "1",
+  "default_action": "deny",
+
+  "signers": {
+    "allowed": [
+      { "key_id": "cerro-official-*", "required": true },
+      { "fingerprint": "SHA256:abc123...", "required": false }
+    ],
+    "threshold": 1
+  },
+
+  "registries": {
+    "allowed": [
+      "docker.io/library/*",
+      "ghcr.io/cerro-torre/*"
+    ],
+    "blocked": []
+  },
+
+  "suites": {
+    "allowed": ["CT-SIG-01", "CT-SIG-02"],
+    "minimum": "CT-SIG-01"
+  }
+}
 ```

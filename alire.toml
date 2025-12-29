@@ -10,7 +10,8 @@ licenses = "Apache-2.0 OR MIT"
 website = "https://cerro-torre.org"
 tags = ["security", "supply-chain", "linux", "containers", "provenance"]
 
-executables = ["cerro"]
+# CLI binary is named "ct" (short for Cerro Torre)
+executables = ["ct"]
 
 # Dependencies - start minimal, add as needed
 # Pin to gnatcoll 25 due to project file resolution issue in 26
@@ -25,33 +26,15 @@ toml_slicer = "*"
 [[depends-on]]
 json = "*"
 
-# For HTTP client (source fetching) - MVP
-# Uncomment when ready to implement fetcher
-# [[depends-on]]
-# aws = ">=24.0.0"
-
-# For HTTP client (source fetching) - MVP
+# For HTTP client (source fetching) - v0.2
 # Uncomment when ready to implement fetcher
 # [[depends-on]]
 # aws = ">=24.0.0"
 
 # For cryptography (SHA256, Ed25519) - MVP
-# Uncomment when libsodium-ada binding is available or use manual C binding
+# Uncomment when libsodium-ada binding is available
 # [[depends-on]]
 # libsodium = "*"
-
-# For HTTP client (source fetching) - MVP
-# Uncomment when ready to implement fetcher
-# [[depends-on]]
-# aws = ">=24.0.0"
-
-# For cryptography (SHA256, Ed25519) - MVP
-# Uncomment when libsodium-ada binding is available or use manual C binding
-# [[depends-on]]
-# libsodium = "*"
-
-[[executables]]
-cerro = "src/cli/cerro_main.adb"
 
 [gpr-externals]
 CERRO_BUILD_MODE = ["Development", "Release", "Proof"]
