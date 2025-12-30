@@ -227,10 +227,30 @@ package body Cerro_CLI is
    end Run_Push;
 
    ------------
-   -- Export --
+   -- Import --
    ------------
 
-   procedure Run_Export is
+   procedure Run_Import is
+   begin
+      Put_Line ("Usage: ct import <archive> [--verify]");
+      Put_Line ("");
+      Put_Line ("Import from offline archive.");
+      Put_Line ("");
+      Put_Line ("Options:");
+      Put_Line ("  --verify            Verify each bundle after import");
+      Put_Line ("  --policy <file>     Policy for verification");
+      Put_Line ("  --keys-only         Only import keys, not bundles");
+      Put_Line ("  --output-dir <dir>  Where to place imported bundles");
+      Put_Line ("");
+      Put_Line ("(v0.2 - Not yet implemented)");
+      Set_Exit_Status (CT_Errors.Exit_General_Failure);
+   end Run_Import;
+
+   ---------
+   -- Run --
+   ---------
+
+   procedure Run_Run is
    begin
       Put_Line ("Usage: ct export <bundles...> -o <archive>");
       Put_Line ("");
