@@ -1,6 +1,9 @@
 = Cerro Torre
+image:https://img.shields.io/badge/license-PMPL--1.0-blue.svg[License,link="https://github.com/hyperpolymath/palimpsest-license"]
 
-image:https://img.shields.io/badge/License-MPL_2.0-blue.svg[MPL-2.0,link="https://opensource.org/licenses/MPL-2.0"]
+
+
+
 image:https://img.shields.io/badge/Philosophy-Palimpsest-purple.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-licence"]
 
 
@@ -87,8 +90,8 @@ See [spec/manifest-format.md](spec/manifest-format.md) for the full specificatio
 
 Cerro Torre tooling is dual-licensed under your choice of:
 
-- *MIT License* — Maximum permissiveness
-- *AGPL-3.0-or-later* — Copyleft with network provisions
+- *Palimpsest-MPL License v1.0 (PMPL-1.0)* — Maximum permissiveness
+- *PMPL-1.0-or-later* — Copyleft with network provisions
 
 The *Palimpsest Covenant* travels alongside as a values commitment (not a legal requirement). Community members are encouraged to adopt it.
 
