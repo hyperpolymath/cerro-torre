@@ -133,12 +133,47 @@ cerro-torre/
 
 == Status
 
-*Phase 0: Foundations* (Current)
+*Phase 0: Foundations — MVP v0.1.0-alpha*
 
-- [ ] Manifest format specification
-- [ ] Governance documents
-- [ ] Ada/SPARK proof of concept
-- [ ] Software Freedom Conservancy application
+=== Implemented ✓
+
+- [x] *Manifest format specification* — `.ctp` TOML-like format with metadata, provenance, dependencies
+- [x] *SHA-256/SHA-512 hashing* — FIPS 180-4 compliant
+- [x] *Ed25519 signatures* — RFC 8032 compliant signature verification
+- [x] *Bundle creation* — `ct pack` creates tar-based `.ctp` bundles
+- [x] *Bundle verification* — `ct verify` checks hashes, signatures, policy
+- [x] *Trust store* — Local key management with trust levels
+- [x] *Help system* — `ct help`, `ct explain`, `ct man` with JSON output for CI/CD
+- [x] *Exit codes* — Specific codes (0-11) for pipeline integration
+- [x] *Governance documents* — Articles, Palimpsest Covenant
+
+=== In Progress
+
+- [ ] Keygen command (private key generation)
+- [ ] Policy engine (allow/deny rules)
+- [ ] Registry fetch/push
+
+== CLI Commands
+
+[source,bash]
+----
+# Core commands
+ct pack <manifest.ctp> -o <output.ctp>    # Create bundle
+ct verify <bundle.ctp> [--policy <file>]   # Verify bundle
+ct explain <topic>                         # Show verification chain
+
+# Key management
+ct keygen [--id <name>]                    # Generate keypair (WIP)
+ct key list                                # List trusted keys
+ct key import <file.pub>                   # Import public key
+ct key trust <id> <level>                  # Set trust (untrusted/marginal/full/ultimate)
+ct key info <id>                           # Show key details
+
+# Help
+ct help [command]                          # Command help
+ct version [--json]                        # Version and crypto suite info
+ct man <topic>                             # Man-page style docs
+----
 
 == Getting Involved
 
