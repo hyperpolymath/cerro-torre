@@ -9,6 +9,7 @@ with CT_Errors;
 with Cerro_Pack;
 with Cerro_Verify;
 with Cerro_Explain;
+with Cerro_Trust_Store;
 
 package body Cerro_CLI is
 
@@ -247,33 +248,319 @@ package body Cerro_CLI is
    -- Key --
    ---------
 
+   procedure Print_Key_Info (Info : Cerro_Trust_Store.Key_Info) is
+      Trust_Str : constant String :=
+         (case Info.Trust is
+            when Cerro_Trust_Store.Untrusted => "untrusted",
+            when Cerro_Trust_Store.Marginal  => "marginal",
+            when Cerro_Trust_Store.Full      => "full",
+            when Cerro_Trust_Store.Ultimate  => "ultimate");
+   begin
+      Put_Line ("  " & Info.Key_Id (1 .. Info.Key_Id_Len));
+      Put_Line ("    Fingerprint: " & Info.Fingerprint (1 .. 16) & "...");
+      Put_Line ("    Trust: " & Trust_Str);
+   end Print_Key_Info;
+
    procedure Run_Key is
+      use Cerro_Trust_Store;
    begin
       if Argument_Count < 2 then
          Put_Line ("Usage: ct key <subcommand> [args]");
          Put_Line ("");
          Put_Line ("Key management subcommands:");
-         Put_Line ("  list                   List all keys");
+         Put_Line ("  list                   List all keys in trust store");
          Put_Line ("  import <file>          Import a public key");
-         Put_Line ("  export <id> --public   Export public key");
+         Put_Line ("  import-hex <hex> <id>  Import key from hex string");
+         Put_Line ("  export <id> -o <file>  Export public key");
          Put_Line ("  delete <id>            Remove a key");
-         Put_Line ("  default <id>           Set default signing key");
+         Put_Line ("  trust <id> <level>     Set trust level (untrusted/marginal/full/ultimate)");
+         Put_Line ("  default [id]           Show or set default signing key");
+         Put_Line ("  info <id>              Show key details");
+         Put_Line ("");
+         Put_Line ("Trust store: " & Get_Store_Path);
          Put_Line ("");
          Put_Line ("Examples:");
          Put_Line ("  ct key list");
          Put_Line ("  ct key import upstream-nginx.pub");
-         Put_Line ("  ct key export my-key --public > my-key.pub");
-         Put_Line ("  ct key default my-key");
+         Put_Line ("  ct key trust nginx-upstream full");
+         Put_Line ("  ct key default my-signing-key");
          Set_Exit_Status (CT_Errors.Exit_General_Failure);
          return;
       end if;
 
+      --  Initialize trust store
+      Initialize;
+
       declare
          Subcommand : constant String := Argument (2);
       begin
-         Put_Line ("Key subcommand: " & Subcommand);
-         Put_Line ("(Not yet implemented)");
-         Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         --  LIST
+         if Subcommand = "list" then
+            declare
+               Count : constant Natural := Key_Count;
+            begin
+               if Count = 0 then
+                  Put_Line ("No keys in trust store.");
+                  Put_Line ("Import keys with: ct key import <file.pub>");
+               else
+                  Put_Line ("Keys in trust store (" & Natural'Image (Count) & "):");
+                  Put_Line ("");
+                  For_Each_Key (Print_Key_Info'Access);
+               end if;
+               Set_Exit_Status (0);
+            end;
+
+         --  IMPORT
+         elsif Subcommand = "import" then
+            if Argument_Count < 3 then
+               Put_Line ("Usage: ct key import <file.pub> [--id <name>]");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            declare
+               Path   : constant String := Argument (3);
+               Key_Id : Unbounded_String := Null_Unbounded_String;
+               Result : Store_Result;
+            begin
+               --  Check for --id flag
+               if Argument_Count >= 5 and then Argument (4) = "--id" then
+                  Key_Id := To_Unbounded_String (Argument (5));
+               end if;
+
+               if Length (Key_Id) > 0 then
+                  Result := Import_Key (Path, To_String (Key_Id));
+               else
+                  Result := Import_Key (Path);
+               end if;
+
+               case Result is
+                  when OK =>
+                     Put_Line ("Key imported successfully.");
+                     Put_Line ("Set trust level with: ct key trust <id> full");
+                     Set_Exit_Status (0);
+                  when Already_Exists =>
+                     Put_Line ("Error: Key already exists in trust store.");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  when Invalid_Key =>
+                     Put_Line ("Error: Invalid key format (expected 64 hex chars).");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  when Invalid_Format =>
+                     Put_Line ("Error: Invalid key ID format.");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  when Not_Found =>
+                     Put_Line ("Error: File not found: " & Path);
+                     Set_Exit_Status (CT_Errors.Exit_IO_Error);
+                  when IO_Error =>
+                     Put_Line ("Error: Could not read file.");
+                     Set_Exit_Status (CT_Errors.Exit_IO_Error);
+               end case;
+            end;
+
+         --  IMPORT-HEX
+         elsif Subcommand = "import-hex" then
+            if Argument_Count < 4 then
+               Put_Line ("Usage: ct key import-hex <hex-pubkey> <key-id>");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            declare
+               Hex_Key : constant String := Argument (3);
+               Key_Id  : constant String := Argument (4);
+               Result  : Store_Result;
+            begin
+               Result := Import_Key_Hex (Hex_Key, Key_Id);
+               case Result is
+                  when OK =>
+                     Put_Line ("Key '" & Key_Id & "' imported successfully.");
+                     Set_Exit_Status (0);
+                  when Already_Exists =>
+                     Put_Line ("Error: Key '" & Key_Id & "' already exists.");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  when Invalid_Key =>
+                     Put_Line ("Error: Invalid hex key (expected 64 hex chars).");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  when others =>
+                     Put_Line ("Error: Could not import key.");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               end case;
+            end;
+
+         --  EXPORT
+         elsif Subcommand = "export" then
+            if Argument_Count < 3 then
+               Put_Line ("Usage: ct key export <key-id> -o <file>");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            declare
+               Key_Id : constant String := Argument (3);
+               Output : Unbounded_String := Null_Unbounded_String;
+               Result : Store_Result;
+               Info   : Key_Info;
+            begin
+               --  Check for -o flag
+               if Argument_Count >= 5 and then Argument (4) = "-o" then
+                  Output := To_Unbounded_String (Argument (5));
+               end if;
+
+               if Length (Output) > 0 then
+                  Result := Export_Key (Key_Id, To_String (Output));
+                  if Result = OK then
+                     Put_Line ("Exported to: " & To_String (Output));
+                     Set_Exit_Status (0);
+                  else
+                     Put_Line ("Error: Key not found: " & Key_Id);
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  end if;
+               else
+                  --  Print to stdout
+                  Result := Get_Key (Key_Id, Info);
+                  if Result = OK then
+                     Put_Line (Info.Public_Key (1 .. Info.Pubkey_Len));
+                     Set_Exit_Status (0);
+                  else
+                     Put_Line ("Error: Key not found: " & Key_Id);
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  end if;
+               end if;
+            end;
+
+         --  DELETE
+         elsif Subcommand = "delete" then
+            if Argument_Count < 3 then
+               Put_Line ("Usage: ct key delete <key-id>");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            declare
+               Key_Id : constant String := Argument (3);
+               Result : Store_Result;
+            begin
+               Result := Delete_Key (Key_Id);
+               if Result = OK then
+                  Put_Line ("Key '" & Key_Id & "' deleted.");
+                  Set_Exit_Status (0);
+               else
+                  Put_Line ("Error: Key not found: " & Key_Id);
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               end if;
+            end;
+
+         --  TRUST
+         elsif Subcommand = "trust" then
+            if Argument_Count < 4 then
+               Put_Line ("Usage: ct key trust <key-id> <level>");
+               Put_Line ("Levels: untrusted, marginal, full, ultimate");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            declare
+               Key_Id    : constant String := Argument (3);
+               Level_Str : constant String := Argument (4);
+               Level     : Trust_Level;
+               Result    : Store_Result;
+            begin
+               if Level_Str = "untrusted" then
+                  Level := Untrusted;
+               elsif Level_Str = "marginal" then
+                  Level := Marginal;
+               elsif Level_Str = "full" then
+                  Level := Full;
+               elsif Level_Str = "ultimate" then
+                  Level := Ultimate;
+               else
+                  Put_Line ("Error: Invalid trust level: " & Level_Str);
+                  Put_Line ("Valid levels: untrusted, marginal, full, ultimate");
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  return;
+               end if;
+
+               Result := Set_Trust (Key_Id, Level);
+               if Result = OK then
+                  Put_Line ("Trust level for '" & Key_Id & "' set to " & Level_Str);
+                  Set_Exit_Status (0);
+               else
+                  Put_Line ("Error: Key not found: " & Key_Id);
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               end if;
+            end;
+
+         --  DEFAULT
+         elsif Subcommand = "default" then
+            if Argument_Count < 3 then
+               --  Show current default
+               declare
+                  Default : constant String := Get_Default_Key;
+               begin
+                  if Default'Length > 0 then
+                     Put_Line ("Default signing key: " & Default);
+                  else
+                     Put_Line ("No default signing key set.");
+                     Put_Line ("Set with: ct key default <key-id>");
+                  end if;
+                  Set_Exit_Status (0);
+               end;
+            else
+               --  Set default
+               declare
+                  Key_Id : constant String := Argument (3);
+                  Result : Store_Result;
+               begin
+                  Result := Set_Default_Key (Key_Id);
+                  if Result = OK then
+                     Put_Line ("Default signing key set to: " & Key_Id);
+                     Set_Exit_Status (0);
+                  else
+                     Put_Line ("Error: Key not found: " & Key_Id);
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  end if;
+               end;
+            end if;
+
+         --  INFO
+         elsif Subcommand = "info" then
+            if Argument_Count < 3 then
+               Put_Line ("Usage: ct key info <key-id>");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            declare
+               Key_Id : constant String := Argument (3);
+               Info   : Key_Info;
+               Result : Store_Result;
+            begin
+               Result := Get_Key (Key_Id, Info);
+               if Result = OK then
+                  Put_Line ("Key: " & Info.Key_Id (1 .. Info.Key_Id_Len));
+                  Put_Line ("Fingerprint: " & Info.Fingerprint (1 .. Info.Finger_Len));
+                  Put_Line ("Public Key: " & Info.Public_Key (1 .. Info.Pubkey_Len));
+                  Put_Line ("Trust Level: " &
+                     (case Info.Trust is
+                        when Untrusted => "untrusted",
+                        when Marginal  => "marginal",
+                        when Full      => "full",
+                        when Ultimate  => "ultimate"));
+                  if Info.Created_Len > 0 then
+                     Put_Line ("Created: " & Info.Created (1 .. Info.Created_Len));
+                  end if;
+                  Set_Exit_Status (0);
+               else
+                  Put_Line ("Error: Key not found: " & Key_Id);
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               end if;
+            end;
+
+         else
+            Put_Line ("Unknown subcommand: " & Subcommand);
+            Put_Line ("Run 'ct key' for usage.");
+            Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         end if;
       end;
    end Run_Key;
 
