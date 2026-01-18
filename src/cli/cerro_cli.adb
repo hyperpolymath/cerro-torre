@@ -1,5 +1,5 @@
 --  Cerro Torre CLI - Command implementations
---  SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+--  SPDX-License-Identifier: PMPL-1.0-or-later
 --  Palimpsest-Covenant: 1.0
 
 with Ada.Text_IO;
@@ -8,6 +8,7 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with CT_Errors;
 with Cerro_Pack;
 with Cerro_Verify;
+with Cerro_Explain;
 
 package body Cerro_CLI is
 
@@ -214,33 +215,7 @@ package body Cerro_CLI is
 
    procedure Run_Explain is
    begin
-      if Argument_Count < 2 then
-         Put_Line ("Usage: ct explain <bundle.ctp> [--signers|--layers]");
-         Put_Line ("");
-         Put_Line ("Print human-readable verification chain.");
-         Put_Line ("");
-         Put_Line ("Options:");
-         Put_Line ("  --signers   Show only signer information");
-         Put_Line ("  --layers    Show only layer digests");
-         Set_Exit_Status (CT_Errors.Exit_General_Failure);
-         return;
-      end if;
-
-      declare
-         Bundle_Path : constant String := Argument (2);
-      begin
-         Put_Line ("Explaining bundle: " & Bundle_Path);
-         Put_Line ("");
-         Put_Line ("(Not yet implemented)");
-         Put_Line ("");
-         Put_Line ("Output will show:");
-         Put_Line ("  - Package info (name, version, suite)");
-         Put_Line ("  - Provenance (source, fetch time)");
-         Put_Line ("  - Content (manifest digest, layers)");
-         Put_Line ("  - Signatures (key id, fingerprint, time)");
-         Put_Line ("  - Trust chain status");
-         Set_Exit_Status (CT_Errors.Exit_General_Failure);
-      end;
+      Cerro_Explain.Run_Explain;
    end Run_Explain;
 
    ------------
@@ -704,5 +679,32 @@ package body Cerro_CLI is
          Set_Exit_Status (CT_Errors.Exit_General_Failure);
       end;
    end Run_Policy;
+
+   ----------
+   -- Help --
+   ----------
+
+   procedure Run_Help is
+   begin
+      Cerro_Explain.Run_Help;
+   end Run_Help;
+
+   ---------
+   -- Man --
+   ---------
+
+   procedure Run_Man is
+   begin
+      Cerro_Explain.Run_Man;
+   end Run_Man;
+
+   -------------
+   -- Version --
+   -------------
+
+   procedure Run_Version is
+   begin
+      Cerro_Explain.Run_Version;
+   end Run_Version;
 
 end Cerro_CLI;

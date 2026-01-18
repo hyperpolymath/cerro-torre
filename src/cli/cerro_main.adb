@@ -1,5 +1,5 @@
 --  Cerro Torre - Ship containers safely
---  SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+--  SPDX-License-Identifier: PMPL-1.0-or-later
 --  Palimpsest-Covenant: 1.0
 --
 --  "Ship containers safely" - the distribution complement to
@@ -66,15 +66,15 @@ begin
    declare
       Command : constant String := Argument (1);
    begin
-      if Command = "--help" or Command = "-h" then
-         Put_Line ("ct " & Version);
-         Put_Line ("Ship containers safely - supply-chain verified distribution");
-         Put_Line ("");
-         Put_Line ("Run 'ct' without arguments for usage.");
-         Put_Line ("See: https://cerro-torre.org");
+      --  Help system (high arity - multiple entry points)
+      if Command = "--help" or Command = "-h" or Command = "help" then
+         Cerro_CLI.Run_Help;
 
-      elsif Command = "--version" or Command = "-v" then
-         Put_Line ("ct " & Version);
+      elsif Command = "--version" or Command = "-v" or Command = "version" then
+         Cerro_CLI.Run_Version;
+
+      elsif Command = "man" then
+         Cerro_CLI.Run_Man;
 
       --  Core commands (MVP v0.1)
       elsif Command = "pack" then

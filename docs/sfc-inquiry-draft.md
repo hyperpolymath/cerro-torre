@@ -28,7 +28,7 @@ The project addresses a gap in the container ecosystem: existing options are eit
 
 Several aspects of Conservancy's mission align with Cerro Torre's goals:
 
-1. **Commitment to software freedom**: Cerro Torre is dual-licensed MIT/AGPL-3.0-or-later, ensuring users always have access to source and the freedom to modify.
+1. **Commitment to software freedom**: Cerro Torre is dual-licensed MIT/PMPL-1.0-or-later, ensuring users always have access to source and the freedom to modify.
 
 2. **Democratic governance**: Like Conservancy member projects, Cerro Torre is committed to community governance. We are drafting cooperative bylaws with asset locks, fork protection, and no path to corporate acquisition.
 

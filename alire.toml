@@ -6,7 +6,7 @@ authors = ["Cerro Torre Cooperative"]
 maintainers = ["cerro-torre@example.org"]
 maintainers-logins = ["cerro-torre"]
 
-licenses = "Apache-2.0 OR MIT"
+licenses = "PMPL-1.0-or-later"
 website = "https://cerro-torre.org"
 tags = ["security", "supply-chain", "linux", "containers", "provenance"]
 

@@ -1,5 +1,5 @@
 --  Cerro_Tar - TAR archive creation
---  SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+--  SPDX-License-Identifier: PMPL-1.0-or-later
 --
 --  Creates POSIX ustar format tar archives.
 

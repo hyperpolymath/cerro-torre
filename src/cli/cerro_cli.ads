@@ -1,5 +1,5 @@
 --  Cerro Torre CLI - Command implementations
---  SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+--  SPDX-License-Identifier: PMPL-1.0-or-later
 --  Palimpsest-Covenant: 1.0
 --
 --  "Ship containers safely" - the distribution complement to Svalinn's
@@ -90,5 +90,19 @@ package Cerro_CLI is
    --  Policy management subcommands
    --  Usage: ct policy <init|add-signer|add-registry|deny>
    procedure Run_Policy;
+
+   --  ======== Help System (v0.1) ========
+
+   --  Show help (multiple entry points for high arity)
+   --  Usage: ct help [command], ct -h, ct --help
+   procedure Run_Help;
+
+   --  Man-page style documentation
+   --  Usage: ct man <topic>
+   procedure Run_Man;
+
+   --  Version and crypto suite info
+   --  Usage: ct version
+   procedure Run_Version;
 
 end Cerro_CLI;

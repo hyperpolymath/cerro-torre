@@ -20,7 +20,7 @@ Minimal base image assembled from democratically-governed upstream (Debian)
 with pinned sources and verifiable inputs. Includes only bash, coreutils,
 and ca-certificates for a functional but minimal container environment.
 """
-license = "MIT OR AGPL-3.0-or-later"
+license = "MIT OR PMPL-1.0-or-later"
 homepage = "https://github.com/hyperpolymath/cerro-torre"
 maintainer = "cerro-torre:core-team"
 

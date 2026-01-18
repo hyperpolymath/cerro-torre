@@ -172,7 +172,7 @@ Financial records shall be available to all members. An annual financial report 
 
 ### 6.1 Licensing
 
-All software produced by the Cooperative shall be released under open source licenses approved by the Open Source Initiative. The default licenses are MIT and AGPL-3.0-or-later (user's choice).
+All software produced by the Cooperative shall be released under open source licenses approved by the Open Source Initiative. The default licenses are PMPL-1.0-or-later (user's choice).
 
 ### 6.2 Trademarks
 

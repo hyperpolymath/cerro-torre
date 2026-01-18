@@ -1,5 +1,5 @@
 --  Cerro_Pack - Package bundling operations
---  SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+--  SPDX-License-Identifier: PMPL-1.0-or-later
 --
 --  Creates .ctp bundles from manifests and source files.
 

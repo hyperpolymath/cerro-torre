@@ -1,5 +1,5 @@
 --  Cerro Torre Provenance - SPARK-verified provenance chain
---  SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+--  SPDX-License-Identifier: PMPL-1.0-or-later
 --  Palimpsest-Covenant: 1.0
 --
 --  This package provides provenance chain verification with formal proofs.
