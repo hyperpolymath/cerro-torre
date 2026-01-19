@@ -1,15 +1,19 @@
 = Cerro Torre
 
-image:[License,link="https://github.com/hyperpolymath/palimpsest-license"]
+image:https://img.shields.io/badge/License-MPL_2.0-blue.svg[MPL-2.0,link="https://opensource.org/licenses/MPL-2.0"]
+image:https://img.shields.io/badge/Philosophy-Palimpsest-purple.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-licence"]
 
 // SPDX-License-Identifier: PMPL-1.0
 // SPDX-FileCopyrightText: 2025 Jonathan D.A. Jewell
 
+:toc: preamble
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
 
+*Provenance-verified container packaging with cryptographic supply chain guarantees.*
 
-*Provenance-verified containers from democratically-governed sources.*
-
-Cerro Torre is a supply-chain-verified Linux distribution for containers and immutable systems. It combines formally verified tooling, radical transparency, and cooperative governance — built primarily on Debian's democratically-governed package ecosystem.
+Cerro Torre is a SPARK/Ada-verified toolchain for packaging container images into cryptographically signed `.ctp` bundles. It provides complete provenance chain from source to deployment, integrating with Svalinn (gateway) and Vörðr (runtime) for verified container operations.
 
 The name references Patagonia's most technically demanding peak. Cerro Torre stands for doing things properly: fair means, complete transparency, no shortcuts.
 
@@ -131,61 +135,180 @@ cerro-torre/
 └── docs/                    # Documentation
 ```
 
-== Status
+== Project Status
 
-*Phase 0: Foundations — MVP v0.1.0-alpha*
+*Phase 0: Foundations -- MVP v0.1.0-alpha*
 
-=== Implemented ✓
+[cols="1,1,3",options="header"]
+|===
+|Component |Status |Description
 
-- [x] *Manifest format specification* — `.ctp` TOML-like format with metadata, provenance, dependencies
-- [x] *SHA-256/SHA-512 hashing* — FIPS 180-4 compliant
-- [x] *Ed25519 signatures* — RFC 8032 compliant signature verification
-- [x] *Bundle creation* — `ct pack` creates tar-based `.ctp` bundles
-- [x] *Bundle verification* — `ct verify` checks hashes, signatures, policy
-- [x] *Trust store* — Local key management with trust levels
-- [x] *Help system* — `ct help`, `ct explain`, `ct man` with JSON output for CI/CD
-- [x] *Exit codes* — Specific codes (0-11) for pipeline integration
-- [x] *Governance documents* — Articles, Palimpsest Covenant
+|*Manifest Parser*
+|Complete
+|`.ctp` TOML-like format with metadata, provenance, dependencies
 
-=== In Progress
+|*Crypto Core*
+|Complete
+|SHA-256/SHA-512 (FIPS 180-4), Ed25519 signatures (RFC 8032)
 
-- [ ] Keygen command (private key generation)
-- [ ] Policy engine (allow/deny rules)
-- [ ] Registry fetch/push
+|*Bundle Packing*
+|Complete
+|`ct pack` creates tar-based `.ctp` bundles
+
+|*Bundle Verification*
+|Complete
+|`ct verify` checks hashes, signatures, policy
+
+|*Trust Store*
+|Complete
+|Local key management with trust levels
+
+|*Help System*
+|Complete
+|`ct help`, `ct explain`, `ct man` with JSON output for CI/CD
+
+|*Policy Engine*
+|In Progress
+|Allow/deny rules for deployment
+
+|*Registry Operations*
+|Planned
+|`ct fetch`, `ct push` for remote registries
+|===
+
+== Building from Source
+
+=== Prerequisites
+
+- GNAT (>= 13.0) -- Ada compiler
+- Alire (recommended) or GPRbuild
+
+=== Build
+
+[source,bash]
+----
+# Using Alire (recommended)
+alr build
+
+# Or directly with GPRbuild
+gprbuild -P cerro_torre.gpr
+
+# Build modes: Development, Release, Proof
+gprbuild -P cerro_torre.gpr -XCERRO_BUILD_MODE=Release
+----
+
+The `ct` binary is placed in `bin/`.
 
 == CLI Commands
 
 [source,bash]
 ----
 # Core commands
-ct pack <manifest.ctp> -o <output.ctp>    # Create bundle
+ct pack <image> -o <file>                  # Pack OCI image into .ctp bundle
 ct verify <bundle.ctp> [--policy <file>]   # Verify bundle
-ct explain <topic>                         # Show verification chain
+ct explain <bundle>                        # Show verification chain
+
+# Runtime integration
+ct run <bundle> [--runtime=svalinn]        # Run via Svalinn/podman/docker
+ct unpack <bundle> -o <dir>                # Extract to OCI layout
 
 # Key management
-ct keygen [--id <name>]                    # Generate keypair (WIP)
+ct keygen [--id <name>]                    # Generate signing keypair
 ct key list                                # List trusted keys
 ct key import <file.pub>                   # Import public key
-ct key trust <id> <level>                  # Set trust (untrusted/marginal/full/ultimate)
-ct key info <id>                           # Show key details
+ct key trust <id> <level>                  # Set trust level
+
+# Distribution
+ct fetch <ref> -o <file>                   # Fetch from registry
+ct push <bundle> <dest>                    # Push to registry
+
+# Diagnostics
+ct doctor                                  # Check pipeline health
+ct diff <old> <new>                        # Compare bundles
 
 # Help
 ct help [command]                          # Command help
-ct version [--json]                        # Version and crypto suite info
+ct version [--json]                        # Version info
 ct man <topic>                             # Man-page style docs
+----
+
+== Integration with Svalinn Ecosystem
+
+[cols="1,2,2",options="header"]
+|===
+|Component |Role |Integration
+
+|*Svalinn*
+|Edge gateway
+|Validates `.ctp` bundles before deployment
+
+|*Vörðr*
+|Container runtime
+|Verifies attestations, executes containers
+
+|*verified-container-spec*
+|Protocol specification
+|Defines attestation formats
+|===
+
+=== End-to-End Workflow
+
+[source,bash]
+----
+# 1. Package an image with Cerro Torre
+ct pack docker.io/library/nginx:1.26 -o nginx.ctp
+
+# 2. Verify the bundle
+ct verify nginx.ctp --policy strict.json
+
+# 3. Run via Svalinn gateway (which delegates to Vörðr)
+ct run nginx.ctp --runtime=svalinn
+
+# Or run directly with Vörðr
+vordr run nginx.ctp --verify
+----
+
+== Project Structure
+
+----
+cerro-torre/
+├── src/
+│   ├── core/               # SPARK-verified (crypto, parsing)
+│   │   ├── cerro_crypto.adb
+│   │   ├── cerro_manifest.adb
+│   │   ├── cerro_provenance.adb
+│   │   └── cerro_trust_store.adb
+│   ├── cli/                # Command-line interface
+│   │   ├── cerro_main.adb
+│   │   └── cerro_cli.adb
+│   ├── build/              # Bundle creation/verification
+│   │   ├── cerro_pack.adb
+│   │   └── cerro_verify.adb
+│   ├── importers/          # Source format importers
+│   │   ├── debian/
+│   │   ├── fedora/
+│   │   └── alpine/
+│   ├── exporters/          # Output format exporters
+│   │   ├── oci/
+│   │   └── rpm-ostree/
+│   ├── policy/             # SELinux generation
+│   └── runtime/            # Runtime integration
+├── spec/                   # Specifications
+│   └── manifest-format.md
+├── governance/             # Cooperative documents
+├── cerro_torre.gpr         # GNAT project file
+└── README.adoc
 ----
 
 == Getting Involved
 
-Read the [Palimpsest Covenant](governance/covenant.md) first. If those values resonate, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Read the link:governance/covenant.md[Palimpsest Covenant] first. If those values resonate, see link:CONTRIBUTING.md[CONTRIBUTING.md].
 
-== Links
+== License
 
-- *Repository*: [GitLab](https://gitlab.com/cerro-torre) (primary), mirrors TBD
-- *Governance*: [Cooperative Documents](governance/)
-- *Specification*: [Manifest Format](spec/manifest-format.md)
-- *Canonical Authority*: [Verification Policy](docs/handovers/)
+Dual-licensed under:
 
----
+* Palimpsest-MPL-1.0 License
+* AGPL-3.0-or-later
 
-*"Choose Alpine or Cerro Torre — you don't need Wolfi, and you really should demand supply chain transparency."*
+See link:LICENSE.txt[LICENSE.txt] for details.
