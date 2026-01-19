@@ -26,10 +26,9 @@ toml_slicer = "*"
 [[depends-on]]
 json = "*"
 
-# For HTTP client (source fetching) - v0.2
-# Uncomment when ready to implement fetcher
-# [[depends-on]]
-# aws = ">=24.0.0"
+# For HTTP client (source fetching, registry, transparency) - v0.2
+[[depends-on]]
+aws = ">=24.0.0"
 
 # For cryptography (SHA256, Ed25519) - MVP
 # Uncomment when libsodium-ada binding is available

@@ -3,7 +3,7 @@
 --  Build with: alr build
 --  Or directly: gprbuild -P cerro_torre.gpr
 
---  with "gnatcoll";  --  TODO: re-enable when gnatcoll is available
+with "config/cerro_torre_config.gpr";
 
 project Cerro_Torre is
 
@@ -18,6 +18,7 @@ project Cerro_Torre is
       "src/build",
       "src/runtime",
       "src/policy",
+      "src/bindings",
       "src/importers/debian",
       "src/importers/fedora",
       "src/importers/alpine",
@@ -87,7 +88,11 @@ project Cerro_Torre is
    end Binder;
 
    --  Linker settings
+   --  Note: When liboqs is installed, link with -loqs for ML-DSA-87 support
+   --  Without liboqs, the library falls back to stub implementations
    package Linker is
+      --  Optional: Add "-loqs" when liboqs is installed
+      --  for Default_Switches ("Ada") use ("-loqs");
       for Default_Switches ("Ada") use ();
    end Linker;
 
