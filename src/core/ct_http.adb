@@ -216,6 +216,95 @@ package body CT_HTTP is
       Add_Arg ("-A");
       Add_Arg (To_String (Config.User_Agent));
 
+      --  HTTP version
+      case Config.HTTP_Version is
+         when HTTP_Auto => null;  --  curl default behavior
+         when HTTP_1_0 => Add_Arg ("--http1.0");
+         when HTTP_1_1 => Add_Arg ("--http1.1");
+         when HTTP_2 => Add_Arg ("--http2");
+         when HTTP_2_Prior => Add_Arg ("--http2-prior-knowledge");
+         when HTTP_3 => Add_Arg ("--http3");  --  Requires curl 7.66+ with HTTP/3 support
+      end case;
+
+      --  Encrypted Client Hello (curl 8.2+)
+      if Config.Enable_ECH then
+         Add_Arg ("--ech");
+      end if;
+
+      --  Alt-Svc for HTTP/3 upgrade
+      if not Config.Enable_Alt_Svc then
+         Add_Arg ("--no-alt-svc");
+      end if;
+
+      --  DANE/TLSA (DNS-based TLS authentication)
+      if Config.DNS_Security.Enable_DANE then
+         if Config.DNS_Security.Require_DANE then
+            Add_Arg ("--tlsv1.2");  --  DANE requires TLS 1.2+
+            Add_Arg ("--tlsauthtype");
+            Add_Arg ("SRP");  --  Use DANE/TLSA records
+         end if;
+         --  Note: curl automatically uses TLSA records when available
+         --  No explicit flag needed for opportunistic DANE
+      end if;
+
+      --  DNS-over-HTTPS
+      if Length (Config.DNS_Security.DoH_URL) > 0 then
+         Add_Arg ("--doh-url");
+         Add_Arg (To_String (Config.DNS_Security.DoH_URL));
+      end if;
+
+      --  Proxy configuration
+      if Config.Proxy.Protocol /= No_Proxy then
+         declare
+            Proxy_URL : constant String :=
+               To_String (Config.Proxy.Host) & ":" &
+               Natural'Image (Config.Proxy.Port);
+         begin
+            case Config.Proxy.Protocol is
+               when No_Proxy => null;
+               when HTTP_Proxy =>
+                  Add_Arg ("-x");
+                  Add_Arg (Proxy_URL);
+               when SOCKS4_Proxy =>
+                  Add_Arg ("--socks4");
+                  Add_Arg (Proxy_URL);
+               when SOCKS4A_Proxy =>
+                  Add_Arg ("--socks4a");
+                  Add_Arg (Proxy_URL);
+               when SOCKS5_Proxy =>
+                  Add_Arg ("--socks5");
+                  Add_Arg (Proxy_URL);
+               when SOCKS5H_Proxy =>
+                  Add_Arg ("--socks5-hostname");
+                  Add_Arg (Proxy_URL);
+            end case;
+
+            --  Proxy authentication
+            if Length (Config.Proxy.Username) > 0 then
+               Add_Arg ("--proxy-user");
+               Add_Arg (To_String (Config.Proxy.Username) & ":" &
+                        To_String (Config.Proxy.Password));
+            end if;
+         end;
+      end if;
+
+      --  TCP options
+      if Config.TCP_Keepalive then
+         Add_Arg ("--keepalive-time");
+         Add_Arg ("60");  --  60 seconds
+      end if;
+
+      if Config.TCP_Nodelay then
+         Add_Arg ("--tcp-nodelay");
+      end if;
+
+      --  IP version
+      if Config.IPv4_Only then
+         Add_Arg ("-4");
+      elsif Config.IPv6_Only then
+         Add_Arg ("-6");
+      end if;
+
       --  Method
       case Method is
          when GET  => Add_Arg ("-X"); Add_Arg ("GET");

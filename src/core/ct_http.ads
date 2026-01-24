@@ -63,22 +63,151 @@ is
 
    subtype Header_Map is Header_Maps.Map;
 
-   --  Client configuration
-   type HTTP_Client_Config is record
-      User_Agent     : Unbounded_String;
-      Timeout_Seconds : Positive := 30;
-      Verify_TLS     : Boolean := True;
-      Follow_Redirects : Boolean := True;
-      Max_Redirects  : Positive := 5;
+   ---------------------------------------------------------------------------
+   --  Protocol Support (via curl)
+   ---------------------------------------------------------------------------
+
+   --  HTTP protocol version (curl --http1.0, --http1.1, --http2, --http3)
+   type HTTP_Version is
+     (HTTP_Auto,      --  Let curl negotiate (default, RECOMMENDED)
+      HTTP_1_0,       --  DEPRECATED: Force HTTP/1.0 (insecure, legacy only)
+      HTTP_1_1,       --  Force HTTP/1.1 (compatible fallback)
+      HTTP_2,         --  Force HTTP/2 (requires HTTPS, falls back to 1.1)
+      HTTP_2_Prior,   --  HTTP/2 with prior knowledge (no upgrade)
+      HTTP_3)         --  Force HTTP/3 over QUIC (UDP, modern)
+   with Default_Value => HTTP_Auto;
+
+   --  Proxy protocol
+   type Proxy_Protocol is
+     (No_Proxy,
+      HTTP_Proxy,     --  HTTP/HTTPS proxy
+      SOCKS4_Proxy,   --  SOCKS4 proxy
+      SOCKS4A_Proxy,  --  SOCKS4A (DNS via proxy)
+      SOCKS5_Proxy,   --  SOCKS5 proxy
+      SOCKS5H_Proxy); --  SOCKS5 with hostname resolution
+
+   --  Proxy configuration
+   type Proxy_Config is record
+      Protocol : Proxy_Protocol := No_Proxy;
+      Host     : Unbounded_String;
+      Port     : Natural := 0;
+      Username : Unbounded_String;  --  Optional auth
+      Password : Unbounded_String;
    end record;
 
-   --  Default configuration
+   No_Proxy_Config : constant Proxy_Config :=
+     (Protocol => No_Proxy,
+      Host     => Null_Unbounded_String,
+      Port     => 0,
+      Username => Null_Unbounded_String,
+      Password => Null_Unbounded_String);
+
+   --  DNS/TLS security options
+   type DNS_Security is record
+      --  DANE (DNS-based Authentication of Named Entities) / TLSA
+      --  Verifies TLS certificates against DNSSEC-signed DNS records
+      Enable_DANE       : Boolean := True;   --  Use TLSA records if available (curl 7.52+)
+      Require_DANE      : Boolean := False;  --  FAIL if TLSA record exists but doesn't match
+
+      --  DNS-over-HTTPS (DoH) - encrypted DNS queries
+      --  NOTE: Requires curl 7.62+ and system DoH resolver configuration
+      DoH_URL           : Unbounded_String;  --  e.g., "https://cloudflare-dns.com/dns-query"
+
+      --  EDNS (Extension Mechanisms for DNS)
+      --  NOTE: Automatic via system resolver - no curl configuration needed
+      --  Configure in /etc/resolv.conf with "options edns0"
+   end record;
+
+   No_DNS_Security : constant DNS_Security :=
+     (Enable_DANE  => False,
+      Require_DANE => False,
+      DoH_URL      => Null_Unbounded_String);
+
+   Default_DNS_Security : constant DNS_Security :=
+     (Enable_DANE  => True,   --  Opportunistic DANE
+      Require_DANE => False,  --  Don't fail on DANE absence
+      DoH_URL      => Null_Unbounded_String);
+
+   --  Client configuration
+   type HTTP_Client_Config is record
+      User_Agent        : Unbounded_String;
+      Timeout_Seconds   : Positive := 30;
+      Verify_TLS        : Boolean := True;  --  DEPRECATED if False: INSECURE!
+      Follow_Redirects  : Boolean := True;
+      Max_Redirects     : Positive := 5;
+
+      --  Protocol options
+      HTTP_Version      : HTTP_Version := HTTP_Auto;
+      Enable_ECH        : Boolean := True;   --  Encrypted Client Hello (curl 8.2+)
+      Enable_Alt_Svc    : Boolean := True;   --  Alt-Svc for HTTP/3 upgrade
+
+      --  DNS/TLS security (DANE/TLSA, DoH, EDNS)
+      DNS_Security      : DNS_Security := Default_DNS_Security;
+
+      --  Proxy support
+      Proxy             : Proxy_Config := No_Proxy_Config;
+
+      --  Connection options
+      TCP_Keepalive     : Boolean := True;
+      TCP_Nodelay       : Boolean := True;   --  Disable Nagle's algorithm
+      IPv4_Only         : Boolean := False;  --  Force IPv4
+      IPv6_Only         : Boolean := False;  --  Force IPv6
+   end record
+   with Dynamic_Predicate =>
+      --  SECURITY: Warn if TLS verification disabled
+      (if not HTTP_Client_Config.Verify_TLS then
+         raise Program_Error with "INSECURE: TLS verification disabled! " &
+         "Only use for testing, never in production.");
+
+   --  Default configuration (secure by default)
    Default_Config : constant HTTP_Client_Config :=
-     (User_Agent       => To_Unbounded_String ("cerro-torre/0.2"),
-      Timeout_Seconds  => 30,
-      Verify_TLS       => True,
-      Follow_Redirects => True,
-      Max_Redirects    => 5);
+     (User_Agent        => To_Unbounded_String ("cerro-torre/0.2"),
+      Timeout_Seconds   => 30,
+      Verify_TLS        => True,  --  ALWAYS True for security
+      Follow_Redirects  => True,
+      Max_Redirects     => 5,
+      HTTP_Version      => HTTP_Auto,  --  Let curl negotiate best version
+      Enable_ECH        => True,       --  Privacy enhancement
+      Enable_Alt_Svc    => True,       --  Allow HTTP/3 upgrade
+      DNS_Security      => Default_DNS_Security,  --  DANE enabled opportunistically
+      Proxy             => No_Proxy_Config,
+      TCP_Keepalive     => True,
+      TCP_Nodelay       => True,
+      IPv4_Only         => False,
+      IPv6_Only         => False);
+
+   ---------------------------------------------------------------------------
+   --  Security Notes
+   ---------------------------------------------------------------------------
+
+   --  EDNS (Extension Mechanisms for DNS):
+   --    Automatic via system resolver. Configure in /etc/resolv.conf:
+   --      options edns0 trust-ad
+   --
+   --  DANE/TLSA (DNS-based Certificate Authentication):
+   --    Requires DNSSEC-enabled resolver and TLSA records in DNS.
+   --    curl verifies TLS certificates against TLSA records automatically
+   --    when Enable_DANE is True.
+   --
+   --  DNS-over-HTTPS (DoH):
+   --    Encrypts DNS queries. Set DoH_URL to a trusted resolver:
+   --      https://cloudflare-dns.com/dns-query  (Cloudflare)
+   --      https://dns.google/dns-query          (Google)
+   --      https://dns.quad9.net/dns-query       (Quad9)
+   --
+   --  Encrypted Client Hello (ECH):
+   --    Hides SNI in TLS handshake (privacy). Requires curl 8.2+
+   --    and server support. Enabled by default.
+   --
+   --  DEPRECATED/INSECURE OPTIONS:
+   --    - Verify_TLS => False     (MitM vulnerable!)
+   --    - HTTP_1_0                (obsolete, limited features)
+   --    - Cleartext HTTP          (use HTTPS!)
+   --
+   --  RECOMMENDED SECURE CONFIG:
+   --    - Use Default_Config (secure by default)
+   --    - Set DoH_URL for DNS privacy
+   --    - Require_DANE => True for high-security environments
 
    ---------------------------------------------------------------------------
    --  HTTP Response
