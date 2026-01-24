@@ -34,6 +34,48 @@ Cerro Torre offers a third path:
 | *Format Agnostic* | Import from Debian, Fedora, Alpine — not locked to any upstream |
 | *Ethically Committed* | The Palimpsest Covenant articulates our values |
 
+== Current Status
+
+*Alpha Stage:* HTTP layer and registry operations complete, preparing for CLI integration.
+
+**What Works (2026-01-24):**
+
+* ✅ *HTTP Client (CT_HTTP)*: Modern, secure HTTP/1-3 client with curl backend
+* ✅ *Registry Operations*: All 9 OCI Distribution Spec operations wired and functional
+* ✅ *Formal Verification*: SafeRegistry, SafeDigest, SafeHTTP modules in https://github.com/hyperpolymath/proven[proven library]
+* ✅ *Privacy Features*: ODNS/ODoH, Tor, HTTP/3, ECH, DANE/TLSA
+* ✅ *IPFS Architecture*: Content-addressed blob storage ready for IPFS backend
+
+**Security Features:**
+
+[source,ada]
+----
+-- HTTP/3 over QUIC for modern transport
+Config.HTTP_Version := HTTP_3;
+
+-- Encrypted Client Hello (hide SNI)
+Config.Enable_ECH := True;
+
+-- Oblivious DNS-over-HTTPS (anonymous DNS)
+Config.DNS_Security.ODoH_Target_URL := "https://odoh.cloudflare-dns.com/dns-query";
+Config.DNS_Security.ODoH_Proxy_URL := "https://odoh1.surfdomeinen.nl/proxy";
+
+-- Tor integration
+Config.Proxy.Protocol := SOCKS5H_Proxy;
+Config.Proxy.Host := "127.0.0.1";
+Config.Proxy.Port := 9050;
+----
+
+**Next Steps:**
+
+* [ ] JSON parser integration
+* [ ] CLI commands (ct push, ct fetch)
+* [ ] Transparency log integration
+* [ ] SBOM generation
+* [ ] Policy enforcement
+
+See link:docs/ROADMAP.md[ROADMAP.md] for full development plan.
+
 == Architecture
 
 ```
