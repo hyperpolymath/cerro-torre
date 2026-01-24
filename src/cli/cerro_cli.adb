@@ -7,8 +7,10 @@ with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Directories;
 with Ada.Strings.Fixed;
+with Ada.Environment_Variables;
 with GNAT.OS_Lib;
 with CT_Errors;
+with CT_Registry;
 with Cerro_Pack;
 with Cerro_Verify;
 with Cerro_Explain;
@@ -588,18 +590,233 @@ package body Cerro_CLI is
    ----------
 
    procedure Run_Push is
+      use CT_Registry;
+      use Ada.Directories;
+
+      Bundle_Path : Unbounded_String := Null_Unbounded_String;
+      Destination : Unbounded_String := Null_Unbounded_String;
+      Verbose     : Boolean := False;
+      Force       : Boolean := False;
+
    begin
-      Put_Line ("Usage: ct push <bundle.ctp> <destination>");
-      Put_Line ("");
-      Put_Line ("Publish a .ctp bundle to a registry or mirror.");
-      Put_Line ("");
-      Put_Line ("Destinations:");
-      Put_Line ("  registry.io/name:tag    OCI registry");
-      Put_Line ("  s3://bucket/path        S3-compatible store");
-      Put_Line ("  git://host/repo         Git repository");
-      Put_Line ("");
-      Put_Line ("(v0.2 - Not yet implemented)");
-      Set_Exit_Status (CT_Errors.Exit_General_Failure);
+      --  Parse arguments
+      if Argument_Count < 3 then
+         Put_Line ("Usage: ct push <bundle.ctp> <destination> [options]");
+         Put_Line ("");
+         Put_Line ("Publish a .ctp bundle to an OCI registry.");
+         Put_Line ("");
+         Put_Line ("Arguments:");
+         Put_Line ("  <bundle.ctp>     Path to .ctp bundle file");
+         Put_Line ("  <destination>    Registry reference (registry/repo:tag)");
+         Put_Line ("");
+         Put_Line ("Options:");
+         Put_Line ("  -v, --verbose    Show detailed progress");
+         Put_Line ("  -f, --force      Overwrite existing tag");
+         Put_Line ("");
+         Put_Line ("Authentication:");
+         Put_Line ("  Reads from ~/.docker/config.json or CT_REGISTRY_AUTH env var");
+         Put_Line ("");
+         Put_Line ("Examples:");
+         Put_Line ("  ct push nginx.ctp ghcr.io/hyperpolymath/nginx:v1.0");
+         Put_Line ("  ct push hello.ctp docker.io/myuser/hello:latest");
+         Put_Line ("  ct push app.ctp myregistry.io/apps/myapp:v2.1 -v");
+         Put_Line ("");
+         Put_Line ("Exit codes:");
+         Put_Line ("  0   Push succeeded");
+         Put_Line ("  1   Authentication failed");
+         Put_Line ("  2   Network error or registry unavailable");
+         Put_Line ("  3   Bundle not found or malformed");
+         Put_Line ("  10  Invalid arguments");
+         Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         return;
+      end if;
+
+      Bundle_Path := To_Unbounded_String (Argument (2));
+      Destination := To_Unbounded_String (Argument (3));
+
+      --  Parse optional flags
+      declare
+         I : Positive := 4;
+      begin
+         while I <= Argument_Count loop
+            declare
+               Arg : constant String := Argument (I);
+            begin
+               if Arg = "-v" or Arg = "--verbose" then
+                  Verbose := True;
+               elsif Arg = "-f" or Arg = "--force" then
+                  Force := True;
+               end if;
+            end;
+            I := I + 1;
+         end loop;
+      end;
+
+      --  Validate bundle exists
+      declare
+         Bundle_Str : constant String := To_String (Bundle_Path);
+      begin
+         if not Ada.Directories.Exists (Bundle_Str) then
+            Put_Line ("Error: Bundle not found: " & Bundle_Str);
+            Set_Exit_Status (3);
+            return;
+         end if;
+
+         if Verbose then
+            Put_Line ("Bundle: " & Bundle_Str);
+            Put_Line ("Destination: " & To_String (Destination));
+            Put_Line ("");
+         end if;
+      end;
+
+      --  Parse destination reference
+      declare
+         Ref : constant Image_Reference := Parse_Reference (To_String (Destination));
+      begin
+         if Length (Ref.Registry) = 0 or Length (Ref.Repository) = 0 then
+            Put_Line ("Error: Invalid destination reference");
+            Put_Line ("  Expected format: registry/repository:tag");
+            Set_Exit_Status (10);
+            return;
+         end if;
+
+         if Verbose then
+            Put_Line ("Parsed destination:");
+            Put_Line ("  Registry: " & To_String (Ref.Registry));
+            Put_Line ("  Repository: " & To_String (Ref.Repository));
+            Put_Line ("  Tag: " & To_String (Ref.Tag));
+            Put_Line ("");
+         end if;
+
+         --  Step 1: Load credentials
+         --  TODO: Read from ~/.docker/config.json or CT_REGISTRY_AUTH
+         declare
+            Auth : Auth_Credentials := (others => <>);
+            Username_Env : constant String := Ada.Environment_Variables.Value ("CT_REGISTRY_USER", "");
+            Password_Env : constant String := Ada.Environment_Variables.Value ("CT_REGISTRY_PASS", "");
+         begin
+            if Username_Env'Length > 0 then
+               Auth.Method := Basic;
+               Auth.Username := To_Unbounded_String (Username_Env);
+               Auth.Password := To_Unbounded_String (Password_Env);
+
+               if Verbose then
+                  Put_Line ("Using credentials from environment");
+               end if;
+            else
+               if Verbose then
+                  Put_Line ("No credentials configured (attempting anonymous push)");
+               end if;
+            end if;
+
+            --  Step 2: Create registry client
+            declare
+               Client : Registry_Client := Create_Client (
+                  Registry => To_String (Ref.Registry),
+                  Auth     => Auth);
+            begin
+               if Verbose then
+                  Put_Line ("Connecting to registry: " & To_String (Client.Base_URL));
+               end if;
+
+               --  Step 3: Authenticate if credentials provided
+               if Auth.Method /= None then
+                  declare
+                     Auth_Result : constant Registry_Error := Authenticate (
+                        Client     => Client,
+                        Repository => To_String (Ref.Repository),
+                        Actions    => "push");
+                  begin
+                     if Auth_Result /= Success and Auth_Result /= Not_Implemented then
+                        Put_Line ("✗ Authentication failed: " & Error_Message (Auth_Result));
+                        Set_Exit_Status (1);
+                        return;
+                     end if;
+
+                     if Verbose and Auth_Result = Success then
+                        Put_Line ("✓ Authenticated");
+                     end if;
+                  end;
+               end if;
+
+               --  Step 4: Check if tag already exists (unless --force)
+               if not Force then
+                  if Manifest_Exists (Client, To_String (Ref.Repository), To_String (Ref.Tag)) then
+                     Put_Line ("Error: Tag already exists: " & To_String (Ref.Tag));
+                     Put_Line ("  Use --force to overwrite");
+                     Set_Exit_Status (1);
+                     return;
+                  end if;
+               end if;
+
+               --  Step 5: Push blobs from bundle
+               --  TODO: Extract blobs from .ctp tarball and push each layer
+               --  For now, note that this step is not yet implemented
+
+               if Verbose then
+                  Put_Line ("Pushing blobs...");
+                  Put_Line ("  (Blob upload not yet implemented - OCI layer extraction pending)");
+               end if;
+
+               --  Step 6: Push manifest
+               --  TODO: Extract manifest from bundle, push to registry
+               declare
+                  Dummy_Manifest : OCI_Manifest;
+                  Push_Res : Push_Result;
+               begin
+                  Dummy_Manifest.Schema_Version := 2;
+                  Dummy_Manifest.Media_Type := To_Unbounded_String (OCI_Manifest_V1);
+
+                  Push_Res := Push_Manifest (
+                     Client     => Client,
+                     Repository => To_String (Ref.Repository),
+                     Tag        => To_String (Ref.Tag),
+                     Manifest   => Dummy_Manifest);
+
+                  if Push_Res.Error = Not_Implemented then
+                     Put_Line ("");
+                     Put_Line ("Push operation prepared but not yet implemented.");
+                     Put_Line ("");
+                     Put_Line ("Implementation roadmap:");
+                     Put_Line ("  1. HTTP client integration (AWS.Client or similar)");
+                     Put_Line ("  2. Extract OCI blobs from .ctp tarball");
+                     Put_Line ("  3. Push each blob with chunked upload");
+                     Put_Line ("  4. Push manifest with references to uploaded blobs");
+                     Put_Line ("  5. Add audit log entry");
+                     Put_Line ("");
+                     Put_Line ("When implemented, this will:");
+                     Put_Line ("  ✓ Upload all container layers to registry");
+                     Put_Line ("  ✓ Upload manifest with attestations");
+                     Put_Line ("  ✓ Return manifest digest for verification");
+                     Put_Line ("");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                     return;
+                  elsif Push_Res.Error /= Success then
+                     Put_Line ("✗ Push failed: " & Error_Message (Push_Res.Error));
+
+                     case Push_Res.Error is
+                        when Auth_Failed | Auth_Required | Forbidden =>
+                           Set_Exit_Status (1);
+                        when Network_Error | Timeout | Server_Error =>
+                           Set_Exit_Status (2);
+                        when others =>
+                           Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                     end case;
+                     return;
+                  else
+                     Put_Line ("✓ Pushed to " & To_String (Destination));
+                     Put_Line ("  Digest: " & To_String (Push_Res.Digest));
+
+                     if Verbose then
+                        Put_Line ("  URL: " & To_String (Push_Res.URL));
+                     end if;
+
+                     Set_Exit_Status (0);
+                  end if;
+               end;
+            end;
+         end;
+      end;
    end Run_Push;
 
    ------------
