@@ -16,6 +16,7 @@ with Ada.Directories;
 with Ada.Characters.Handling;
 with Ada.Strings.Fixed;
 with Ada.Streams.Stream_IO;
+with Ada.Exceptions;
 with Cerro_URL;
 
 package body CT_HTTP is
@@ -57,7 +58,7 @@ package body CT_HTTP is
 
    function Read_File_Contents (Path : String) return String is
       use Ada.Streams.Stream_IO;
-      File   : File_Type;
+      File   : Ada.Streams.Stream_IO.File_Type;
       Buffer : String (1 .. Natural (Ada.Directories.Size (Path)));
    begin
       Open (File, In_File, Path);
@@ -106,7 +107,7 @@ package body CT_HTTP is
         (Status_Code   => 0,
          Status_Reason => Null_Unbounded_String,
          Headers       => Header_Maps.Empty_Map,
-         Body          => Null_Unbounded_String,
+         Content       => Null_Unbounded_String,
          Error_Message => Null_Unbounded_String,
          Success       => False);
    end Empty_Response;
@@ -167,7 +168,7 @@ package body CT_HTTP is
       Config       : HTTP_Client_Config;
       Auth         : Auth_Credentials;
       Headers      : Header_Map;
-      Body         : String := "";
+      Request_Body : String := "";
       Content_Type : String := "";
       Output_File  : String := "";
       Input_File   : String := "") return HTTP_Response
@@ -218,7 +219,7 @@ package body CT_HTTP is
       Add_Arg (To_String (Config.User_Agent));
 
       --  HTTP version
-      case Config.HTTP_Version is
+      case Config.Protocol_Version is
          when HTTP_Auto => null;  --  curl default behavior
          when HTTP_1_0 => Add_Arg ("--http1.0");
          when HTTP_1_1 => Add_Arg ("--http1.1");
@@ -238,8 +239,8 @@ package body CT_HTTP is
       end if;
 
       --  DANE/TLSA (DNS-based TLS authentication)
-      if Config.DNS_Security.Enable_DANE then
-         if Config.DNS_Security.Require_DANE then
+      if Config.DNS_Sec.Enable_DANE then
+         if Config.DNS_Sec.Require_DANE then
             Add_Arg ("--tlsv1.2");  --  DANE requires TLS 1.2+
             Add_Arg ("--tlsauthtype");
             Add_Arg ("SRP");  --  Use DANE/TLSA records
@@ -249,21 +250,21 @@ package body CT_HTTP is
       end if;
 
       --  DNS-over-HTTPS
-      if Length (Config.DNS_Security.DoH_URL) > 0 then
+      if Length (Config.DNS_Sec.DoH_URL) > 0 then
          Add_Arg ("--doh-url");
-         Add_Arg (To_String (Config.DNS_Security.DoH_URL));
+         Add_Arg (To_String (Config.DNS_Sec.DoH_URL));
       end if;
 
       --  Oblivious DNS-over-HTTPS (ODoH / ODNS)
       --  Requires both target and proxy URLs (curl 7.73+)
-      if Length (Config.DNS_Security.ODoH_Target_URL) > 0 and then
-         Length (Config.DNS_Security.ODoH_Proxy_URL) > 0
+      if Length (Config.DNS_Sec.ODoH_Target_URL) > 0 and then
+         Length (Config.DNS_Sec.ODoH_Proxy_URL) > 0
       then
          --  Note: As of curl 8.x, ODoH support is experimental
          --  Use --doh-url with the target, then configure proxy separately
          --  This is a simplified implementation - full ODoH may need additional flags
          Add_Arg ("--doh-url");
-         Add_Arg (To_String (Config.DNS_Security.ODoH_Target_URL));
+         Add_Arg (To_String (Config.DNS_Sec.ODoH_Target_URL));
          --  TODO: Add ODoH proxy configuration when curl support stabilizes
          --  For now, this provides basic DoH to the target URL
       end if;
@@ -353,13 +354,13 @@ package body CT_HTTP is
       end;
 
       --  Body handling
-      if Body'Length > 0 then
+      if Request_Body'Length > 0 then
          --  Write body to temp file
          declare
             F : File_Type;
          begin
             Create (F, Out_File, Body_In_File);
-            Put (F, Body);
+            Put (F, Request_Body);
             Close (F);
          end;
 
@@ -386,14 +387,15 @@ package body CT_HTTP is
          Add_Arg (Output_File);
       else
          Add_Arg ("-o");
-         Add_Arg (Data_File);
+         Add_Arg (Body_File);
       end if;
 
       --  URL (must be last)
       Add_Arg (URL);
 
       --  Execute curl
-      Spawn ("/usr/bin/curl", Arg_List (1 .. Arg_Count), Return_Code, Success);
+      Spawn ("/usr/bin/curl", Arg_List (1 .. Arg_Count), Success);
+      Return_Code := 0;  --  Success is set by Spawn, assume 0 if successful
 
       --  Parse response
       if Success and Return_Code = 0 then
@@ -459,8 +461,8 @@ package body CT_HTTP is
          end if;
 
          --  Read body (if not output to file)
-         if Output_File'Length = 0 and Ada.Directories.Exists (Data_File) then
-            Response.Content := To_Unbounded_String (Read_File_Contents (Data_File));
+         if Output_File'Length = 0 and Ada.Directories.Exists (Body_File) then
+            Response.Content := To_Unbounded_String (Read_File_Contents (Body_File));
          end if;
       else
          Response.Success := False;
@@ -469,8 +471,8 @@ package body CT_HTTP is
 
       --  Cleanup temp files
       Delete_File_Safe (Header_File);
-      Delete_File_Safe (Data_File);
-      Delete_File_Safe (Data_In_File);
+      Delete_File_Safe (Body_File);
+      Delete_File_Safe (Body_In_File);
 
       --  Free argument memory
       for I in 1 .. Arg_Count loop
@@ -483,8 +485,8 @@ package body CT_HTTP is
       when E : others =>
          --  Cleanup on error
          Delete_File_Safe (Header_File);
-         Delete_File_Safe (Data_File);
-         Delete_File_Safe (Data_In_File);
+         Delete_File_Safe (Body_File);
+         Delete_File_Safe (Body_In_File);
          for I in 1 .. Arg_Count loop
             Free (Arg_List (I));
          end loop;
@@ -509,26 +511,26 @@ package body CT_HTTP is
 
    function Post
      (URL          : String;
-      Body         : String;
+      Data         : String;
       Content_Type : String := "application/json";
       Config       : HTTP_Client_Config := Default_Config;
       Auth         : Auth_Credentials := No_Credentials;
       Headers      : Header_Map := Header_Maps.Empty_Map) return HTTP_Response
    is
    begin
-      return Execute_Curl (POST, URL, Config, Auth, Headers, Body, Content_Type);
+      return Execute_Curl (POST, URL, Config, Auth, Headers, Data, Content_Type);
    end Post;
 
    function Put
      (URL          : String;
-      Body         : String;
+      Data         : String;
       Content_Type : String := "application/json";
       Config       : HTTP_Client_Config := Default_Config;
       Auth         : Auth_Credentials := No_Credentials;
       Headers      : Header_Map := Header_Maps.Empty_Map) return HTTP_Response
    is
    begin
-      return Execute_Curl (PUT, URL, Config, Auth, Headers, Body, Content_Type);
+      return Execute_Curl (PUT, URL, Config, Auth, Headers, Data, Content_Type);
    end Put;
 
    function Delete
@@ -553,14 +555,14 @@ package body CT_HTTP is
 
    function Patch
      (URL          : String;
-      Body         : String;
+      Data         : String;
       Content_Type : String := "application/json";
       Config       : HTTP_Client_Config := Default_Config;
       Auth         : Auth_Credentials := No_Credentials;
       Headers      : Header_Map := Header_Maps.Empty_Map) return HTTP_Response
    is
    begin
-      return Execute_Curl (PATCH, URL, Config, Auth, Headers, Body, Content_Type);
+      return Execute_Curl (PATCH, URL, Config, Auth, Headers, Data, Content_Type);
    end Patch;
 
    ---------------------------------------------------------------------------

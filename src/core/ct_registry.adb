@@ -31,6 +31,31 @@ package body CT_Registry is
    use Ada.Strings.Fixed;
 
    ---------------------------------------------------------------------------
+   --  Authentication Conversion
+   ---------------------------------------------------------------------------
+
+   function To_HTTP_Auth (Reg_Auth : Registry_Auth_Credentials) return CT_HTTP.Auth_Credentials
+   is
+      HTTP_Auth : CT_HTTP.Auth_Credentials;
+   begin
+      --  Convert registry auth method to HTTP auth scheme
+      case Reg_Auth.Method is
+         when None =>
+            HTTP_Auth.Scheme := CT_HTTP.No_Auth;
+         when Basic =>
+            HTTP_Auth.Scheme := CT_HTTP.Basic_Auth;
+            HTTP_Auth.Username := Reg_Auth.Username;
+            HTTP_Auth.Password := Reg_Auth.Password;
+         when Bearer | AWS_ECR | GCP_GCR | Azure_ACR =>
+            --  All token-based auth becomes Bearer_Token for HTTP layer
+            HTTP_Auth.Scheme := CT_HTTP.Bearer_Token;
+            HTTP_Auth.Token := Reg_Auth.Token;
+      end case;
+
+      return HTTP_Auth;
+   end To_HTTP_Auth;
+
+   ---------------------------------------------------------------------------
    --  Internal Constants
    ---------------------------------------------------------------------------
 
@@ -42,7 +67,7 @@ package body CT_Registry is
 
    function Create_Client
      (Registry : String;
-      Auth     : Auth_Credentials := (others => <>)) return Registry_Client
+      Auth     : Registry_Auth_Credentials := (others => <>)) return Registry_Client
    is
       Client : Registry_Client;
       Reg    : String := Registry;

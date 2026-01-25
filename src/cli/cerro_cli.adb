@@ -688,12 +688,12 @@ package body Cerro_CLI is
 
          --  Step 1: Load credentials
          declare
-            Auth : Auth_Credentials := (others => <>);
+            Auth : CT_Registry.Registry_Auth_Credentials := (others => <>);
             Username_Env : constant String := Ada.Environment_Variables.Value ("CT_REGISTRY_USER", "");
             Password_Env : constant String := Ada.Environment_Variables.Value ("CT_REGISTRY_PASS", "");
          begin
             if Username_Env'Length > 0 then
-               Auth.Method := Basic;
+               Auth.Method := CT_Registry.Basic;
                Auth.Username := To_Unbounded_String (Username_Env);
                Auth.Password := To_Unbounded_String (Password_Env);
 
@@ -717,7 +717,7 @@ package body Cerro_CLI is
                end if;
 
                --  Step 3: Authenticate if credentials provided
-               if Auth.Method /= None then
+               if Auth.Method /= CT_Registry.None then
                   declare
                      Auth_Result : constant Registry_Error := Authenticate (
                         Client     => Client,
@@ -940,12 +940,12 @@ package body Cerro_CLI is
          --  Step 1: Load credentials
          --  TODO: Read from ~/.docker/config.json or CT_REGISTRY_AUTH
          declare
-            Auth : Auth_Credentials := (others => <>);
+            Auth : CT_Registry.Registry_Auth_Credentials := (others => <>);
             Username_Env : constant String := Ada.Environment_Variables.Value ("CT_REGISTRY_USER", "");
             Password_Env : constant String := Ada.Environment_Variables.Value ("CT_REGISTRY_PASS", "");
          begin
             if Username_Env'Length > 0 then
-               Auth.Method := Basic;
+               Auth.Method := CT_Registry.Basic;
                Auth.Username := To_Unbounded_String (Username_Env);
                Auth.Password := To_Unbounded_String (Password_Env);
 
@@ -969,7 +969,7 @@ package body Cerro_CLI is
                end if;
 
                --  Step 3: Authenticate if credentials provided
-               if Auth.Method /= None then
+               if Auth.Method /= CT_Registry.None then
                   declare
                      Auth_Result : constant Registry_Error := Authenticate (
                         Client     => Client,

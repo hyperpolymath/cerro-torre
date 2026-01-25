@@ -109,8 +109,8 @@ package body CT_JSON is
 
          --  Find end of number (comma, brace, or whitespace)
          while Value_End <= JSON'Last and then
-               JSON (Value_End) /= ',' and
-               JSON (Value_End) /= '}' and
+               JSON (Value_End) /= ',' and then
+               JSON (Value_End) /= '}' and then
                JSON (Value_End) /= ' '
          loop
             Value_End := Value_End + 1;

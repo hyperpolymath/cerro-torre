@@ -68,14 +68,14 @@ is
    ---------------------------------------------------------------------------
 
    --  HTTP protocol version (curl --http1.0, --http1.1, --http2, --http3)
+   --  Default: HTTP_Auto (let curl negotiate, RECOMMENDED)
    type HTTP_Version is
      (HTTP_Auto,      --  Let curl negotiate (default, RECOMMENDED)
       HTTP_1_0,       --  DEPRECATED: Force HTTP/1.0 (insecure, legacy only)
       HTTP_1_1,       --  Force HTTP/1.1 (compatible fallback)
       HTTP_2,         --  Force HTTP/2 (requires HTTPS, falls back to 1.1)
       HTTP_2_Prior,   --  HTTP/2 with prior knowledge (no upgrade)
-      HTTP_3)         --  Force HTTP/3 over QUIC (UDP, modern)
-   with Default_Value => HTTP_Auto;
+      HTTP_3);        --  Force HTTP/3 over QUIC (UDP, modern)
 
    --  Proxy protocol
    type Proxy_Protocol is
@@ -147,12 +147,12 @@ is
       Max_Redirects     : Positive := 5;
 
       --  Protocol options
-      HTTP_Version      : HTTP_Version := HTTP_Auto;
+      Protocol_Version  : HTTP_Version := HTTP_Auto;  --  Let curl negotiate
       Enable_ECH        : Boolean := True;   --  Encrypted Client Hello (curl 8.2+)
       Enable_Alt_Svc    : Boolean := True;   --  Alt-Svc for HTTP/3 upgrade
 
       --  DNS/TLS security (DANE/TLSA, DoH, EDNS)
-      DNS_Security      : DNS_Security := Default_DNS_Security;
+      DNS_Sec           : DNS_Security := Default_DNS_Security;  --  Renamed field
 
       --  Proxy support
       Proxy             : Proxy_Config := No_Proxy_Config;
@@ -173,10 +173,10 @@ is
       Verify_TLS        => True,  --  ALWAYS True for security
       Follow_Redirects  => True,
       Max_Redirects     => 5,
-      HTTP_Version      => HTTP_Auto,  --  Let curl negotiate best version
+      Protocol_Version  => HTTP_Auto,  --  Let curl negotiate best version
       Enable_ECH        => True,       --  Privacy enhancement
       Enable_Alt_Svc    => True,       --  Allow HTTP/3 upgrade
-      DNS_Security      => Default_DNS_Security,  --  DANE enabled opportunistically
+      DNS_Sec           => Default_DNS_Security,  --  DANE enabled opportunistically
       Proxy             => No_Proxy_Config,
       TCP_Keepalive     => True,
       TCP_Nodelay       => True,
@@ -233,8 +233,8 @@ is
    --  HTTP Response
    ---------------------------------------------------------------------------
 
-   --  HTTP status code categories
-   subtype Status_Code is Natural range 100 .. 599;
+   --  HTTP status code categories (0 = no response)
+   subtype Status_Code is Natural range 0 .. 599;
 
    function Is_Success (Code : Status_Code) return Boolean
    with Global => null,

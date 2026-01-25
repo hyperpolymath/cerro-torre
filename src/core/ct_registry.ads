@@ -23,6 +23,7 @@
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Containers.Vectors;
 with Interfaces;
+with CT_HTTP;
 
 package CT_Registry
    with SPARK_Mode => On
@@ -41,8 +42,8 @@ is
       Digest     : Unbounded_String;  --  e.g., "sha256:abc..." or ""
    end record;
 
-   --  Authentication method
-   type Auth_Method is
+   --  Registry-specific authentication method (high-level)
+   type Registry_Auth_Method is
      (None,            --  No authentication
       Basic,           --  HTTP Basic Auth
       Bearer,          --  OAuth2 Bearer Token
@@ -50,13 +51,17 @@ is
       GCP_GCR,         --  GCP Artifact Registry
       Azure_ACR);      --  Azure Container Registry
 
-   --  Authentication credentials
-   type Auth_Credentials is record
-      Method   : Auth_Method := None;
+   --  Registry authentication credentials (extends CT_HTTP.Auth_Credentials concept)
+   type Registry_Auth_Credentials is record
+      Method   : Registry_Auth_Method := None;
       Username : Unbounded_String;
       Password : Unbounded_String;  --  Or token for Bearer
       Token    : Unbounded_String;  --  Exchanged bearer token
    end record;
+
+   --  Convert registry auth to HTTP auth for making requests
+   function To_HTTP_Auth (Reg_Auth : Registry_Auth_Credentials) return CT_HTTP.Auth_Credentials
+   with Global => null;
 
    --  Media types for manifests
    OCI_Manifest_V1        : constant String := "application/vnd.oci.image.manifest.v1+json";
@@ -154,7 +159,7 @@ is
 
    type Registry_Client is record
       Base_URL     : Unbounded_String;  --  e.g., "https://ghcr.io"
-      Auth         : Auth_Credentials;
+      Auth         : Registry_Auth_Credentials;
       User_Agent   : Unbounded_String;  --  Client identifier
       Timeout_Ms   : Positive := 30_000;  --  Request timeout
       Verify_TLS   : Boolean := True;    --  Verify TLS certificates
@@ -165,7 +170,7 @@ is
 
    function Create_Client
      (Registry : String;
-      Auth     : Auth_Credentials := (others => <>)) return Registry_Client
+      Auth     : Registry_Auth_Credentials := (others => <>)) return Registry_Client
    with Global => null,
         Pre    => Registry'Length > 0 and Registry'Length <= 256;
 
