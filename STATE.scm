@@ -16,11 +16,13 @@
        (tech-stack ((primary . "Ada/SPARK") (build-system . "Alire") (http-backend . "curl") (registry-protocol . "OCI Distribution v2")))))
 
     (current-position
-      ((phase . "Phase 2: CLI Wiring & Live Testing - COMPLETE | Registry fetch/push working")
-       (overall-completion . 78)
+      ((phase . "Phase 3: Signing & Attestations - IN PROGRESS | Ed25519 signing module ready")
+       (overall-completion . 82)
        (components
          ((core-crypto . ((status . "working") (completion . 100)
                           (notes . "SHA-256/512 FIPS 180-4, Ed25519 RFC 8032 - all tests passing")))
+          (crypto-openssl . ((status . "working") (completion . 90)
+                             (notes . "Ed25519 signing via OpenSSL 3.x, keygen/sign operations, needs CLI integration")))
           (http-client . ((status . "working") (completion . 98)
                           (notes . "curl-based client, TLS, auth, ECH disabled for MVP, curl param formatting fixed")))
           (registry-client . ((status . "working") (completion . 100)
@@ -49,6 +51,7 @@
           (ct-pack . "Creates .ctp tar bundles")
           (ct-verify . "Verifies bundle integrity")
           (ct-key . "Key management: list, import, export, trust, delete")
+          (ed25519-signing . "OpenSSL-based Ed25519 signing (keygen/sign ready, needs CLI wiring)")
           (ct-help . "Command help with --json")
           (ct-explain . "Conceptual explanations")
           (ct-version . "Version info with --json")
@@ -67,12 +70,12 @@
           (v0.2-base-camp
             ((status . "in-progress")
              (started . "2026-01-25")
-             (progress . 78)
-             (features-complete . ("Registry pull", "Registry push (localhost)", "HTTP client", "Reference parsing", "Auth conversion"))
-             (features-in-progress . ("Cloud registry testing (ghcr.io/docker.io)"))
-             (features-pending . ("Ed25519 signing", "Rekor submission", "Policy engine"))
+             (progress . 82)
+             (features-complete . ("Registry pull", "Registry push (localhost)", "HTTP client", "Reference parsing", "Auth conversion", "Debug logging", "Ed25519 signing module"))
+             (features-in-progress . ("Ed25519 CLI integration (ct sign/keygen)", "Cloud registry testing"))
+             (features-pending . ("Rekor submission", "Policy engine"))
              (target . "2026-02-15")
-             (notes . "Distribution phase - CLI wiring 78% complete, fetch/push working locally")))
+             (notes . "Phase 3 started - Signing module complete, needs CLI wiring")))
           (v0.3-the-wall
             ((status . "planned")
              (features . "Full attestations, transparency log integration, policy enforcement")
@@ -104,7 +107,7 @@
                     (ct-push-upload . "Push working with localhost:5000, verified round-trip fetch/push")))))
 
     (critical-next-actions
-      ((immediate . ("Test with ghcr.io/Docker Hub (requires authentication setup)" "Remove or make HTTP debug logging configurable"))
+      ((immediate . ("Wire Ed25519 signing to CLI (ct sign, ct keygen commands)" "Test with ghcr.io/Docker Hub (requires authentication)"))
        (this-week . ("Implement Ed25519 signing (openssl wrapper)" "Submit test attestation to Rekor" "Document usage examples"))
        (this-month . ("Verify Merkle inclusion proofs" "Complete policy engine" "First Debian package import"))
        (deferred-to-production . ("Fix proven library" "Enable ECH" "Full OCI blob upload"))))
@@ -116,7 +119,8 @@
        (session-2026-01-25d . "CLI wiring: Run_Fetch and Run_Push connected to backend operations")
        (session-2026-01-25e . "Live testing: Fixed curl params, localhost port parsing, ECH disabled, ct fetch working")
        (session-2026-01-25f . "Status: 48/48 tests passing (100%), fetch working live, push debugging, 72% complete")
-       (session-2026-01-25g . "Push validation: ct push working, round-trip fetch/push verified, debug logging added, 78% complete")))))
+       (session-2026-01-25g . "Push validation: ct push working, round-trip fetch/push verified, debug logging added, 78% complete")
+       (session-2026-01-25h . "Phase 3 start: Debug logging configurable, Ed25519 signing module created via OpenSSL, 82% complete")))))
 
 ;; Helper functions for querying state
 

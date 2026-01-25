@@ -36,15 +36,16 @@ Cerro Torre offers a third path:
 
 == Current Status
 
-*Phase 2 - Complete:* Registry fetch/push working, cloud testing pending. *78% complete*
+*Phase 3 - In Progress:* Ed25519 signing module ready, CLI integration next. *82% complete*
 
 **What Works (2026-01-25):**
 
-* ✅ *HTTP Client (CT_HTTP)*: Curl-based client with TLS, auth, modern protocol support
+* ✅ *HTTP Client (CT_HTTP)*: Curl-based client with TLS, auth, modern protocol support, configurable debug logging
 * ✅ *Registry Client (CT_Registry)*: OCI Distribution v2, pull/push manifests, authentication
 * ✅ *CLI Framework*: `ct fetch` and `ct push` working live, `ct pack`/`ct verify` complete
 * ✅ *Transparency Logs*: Rekor API client, log entry structures, upload/get operations
 * ✅ *Cryptography*: SHA-256/512, Ed25519 verification, all tests passing
+* ✅ *Ed25519 Signing*: OpenSSL-based signing module (keygen, sign operations ready)
 * ✅ *Test Suite*: 48/48 tests passing (100%), live registry testing validated
 
 **Try It Now:**
@@ -84,11 +85,13 @@ alr build
 **Immediate Next Steps:**
 
 * [x] ~~Debug ct push manifest upload~~ (DONE - working with localhost:5000)
+* [x] ~~Make HTTP debug logging configurable~~ (DONE - disabled by default)
+* [x] ~~Implement Ed25519 signing module~~ (DONE - OpenSSL wrapper ready)
+* [ ] Wire signing to CLI: `ct sign` and `ct keygen` commands
+* [ ] Test signing end-to-end (generate key → sign bundle → verify)
 * [ ] Test with GitHub Container Registry (ghcr.io) - requires authentication token
 * [ ] Test with Docker Hub (docker.io) - requires credentials
-* [ ] Implement Ed25519 signing (openssl wrapper for MVP)
 * [ ] Submit test attestation to Rekor
-* [ ] Make HTTP debug logging configurable (currently always-on)
 
 See link:docs/ROADMAP.md[ROADMAP.md], link:IMPLEMENTATION-STATUS.md[IMPLEMENTATION-STATUS.md], and link:SESSION-LIVE-TESTING-2026-01-25.md[latest session notes] for detailed status.
 
