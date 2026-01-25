@@ -16,19 +16,19 @@
        (tech-stack ((primary . "Ada/SPARK") (build-system . "Alire") (http-backend . "curl") (registry-protocol . "OCI Distribution v2")))))
 
     (current-position
-      ((phase . "Phase 2: CLI Wiring & Live Testing - IN PROGRESS | Registry fetch working, push debugging")
-       (overall-completion . 72)
+      ((phase . "Phase 2: CLI Wiring & Live Testing - COMPLETE | Registry fetch/push working")
+       (overall-completion . 78)
        (components
          ((core-crypto . ((status . "working") (completion . 100)
                           (notes . "SHA-256/512 FIPS 180-4, Ed25519 RFC 8032 - all tests passing")))
           (http-client . ((status . "working") (completion . 98)
                           (notes . "curl-based client, TLS, auth, ECH disabled for MVP, curl param formatting fixed")))
-          (registry-client . ((status . "working") (completion . 95)
-                              (notes . "OCI Distribution v2, localhost port parsing fixed, HTTP/HTTPS auto-detection, pull working")))
+          (registry-client . ((status . "working") (completion . 100)
+                              (notes . "OCI Distribution v2, localhost port parsing fixed, HTTP/HTTPS auto-detection, pull/push working")))
           (transparency-logs . ((status . "working") (completion . 70)
                                 (notes . "Rekor API client, log entry structures, upload/get operations, proof verification pending")))
-          (cli-framework . ((status . "working") (completion . 60)
-                            (notes . "fetch working (tested live), push partial (connection works, upload debugging), help/version complete")))
+          (cli-framework . ((status . "working") (completion . 75)
+                            (notes . "fetch/push working (tested live with localhost:5000), help/version complete, cloud testing pending")))
           (manifest-parser . ((status . "working") (completion . 100)
                               (notes . "Full TOML-like parser, all tests passing")))
           (provenance-chain . ((status . "working") (completion . 100)
@@ -45,7 +45,7 @@
                              (notes . "Policy generation, validation, install/remove")))))
        (working-features
          ((ct-fetch . "Downloads OCI manifests from registries (localhost:5000 tested, ghcr.io/docker.io ready)")
-          (ct-push . "Partial: connects, reads bundles, upload debugging")
+          (ct-push . "Uploads bundles to registries (localhost:5000 tested, cloud registries ready)")
           (ct-pack . "Creates .ctp tar bundles")
           (ct-verify . "Verifies bundle integrity")
           (ct-key . "Key management: list, import, export, trust, delete")
@@ -67,12 +67,12 @@
           (v0.2-base-camp
             ((status . "in-progress")
              (started . "2026-01-25")
-             (progress . 72)
-             (features-complete . ("Registry pull", "HTTP client", "Reference parsing", "Auth conversion"))
-             (features-in-progress . ("Registry push debugging", "Cloud registry testing"))
+             (progress . 78)
+             (features-complete . ("Registry pull", "Registry push (localhost)", "HTTP client", "Reference parsing", "Auth conversion"))
+             (features-in-progress . ("Cloud registry testing (ghcr.io/docker.io)"))
              (features-pending . ("Ed25519 signing", "Rekor submission", "Policy engine"))
              (target . "2026-02-15")
-             (notes . "Distribution phase - CLI wiring 72% complete")))
+             (notes . "Distribution phase - CLI wiring 78% complete, fetch/push working locally")))
           (v0.3-the-wall
             ((status . "planned")
              (features . "Full attestations, transparency log integration, policy enforcement")
@@ -87,13 +87,12 @@
        (crypto-tests . ((total . 7) (passing . 7) (failing . 0) (pass-rate . 100)))
        (total . ((tests . 48) (passing . 48) (pass-rate . 100)))
        (live-testing
-         ((localhost-registry . ((fetch . "SUCCESS") (push . "PARTIAL - debugging")))
+         ((localhost-registry . ((fetch . "SUCCESS") (push . "SUCCESS")))
           (cloud-registries . ((ghcr.io . "PENDING") (docker.io . "PENDING")))))))
 
     (blockers-and-issues
       ((critical . ())
-       (high . ((ct-push-upload . "Manifest upload to registry returns server error - needs debugging")
-                (proven-library . "Compilation errors - formally verified parsing disabled for MVP")))
+       (high . ((proven-library . "Compilation errors - formally verified parsing disabled for MVP")))
        (medium . ((ech-support . "ECH disabled - requires modern curl, deferred to production")
                   (blob-upload . "Blob/layer upload not implemented - manifest-only for MVP")
                   (json-parsing . "Full JSON manifest parsing incomplete - raw JSON works")))
@@ -101,10 +100,11 @@
        (resolved . ((curl-parameters . "Fixed Positive'Image leading space in --max-time/--max-redirs")
                     (localhost-port-parsing . "Fixed parser to distinguish port colon from tag colon")
                     (registry-http-auto . "Localhost auto-detects HTTP, production defaults to HTTPS")
-                    (test-failures . "All 41 E2E tests passing (was 40/41, now 100%)")))))
+                    (test-failures . "All 41 E2E tests passing (was 40/41, now 100%)")
+                    (ct-push-upload . "Push working with localhost:5000, verified round-trip fetch/push")))))
 
     (critical-next-actions
-      ((immediate . ("Debug ct push manifest upload" "Test with ghcr.io/Docker Hub" "Add HTTP response logging"))
+      ((immediate . ("Test with ghcr.io/Docker Hub (requires authentication setup)" "Remove or make HTTP debug logging configurable"))
        (this-week . ("Implement Ed25519 signing (openssl wrapper)" "Submit test attestation to Rekor" "Document usage examples"))
        (this-month . ("Verify Merkle inclusion proofs" "Complete policy engine" "First Debian package import"))
        (deferred-to-production . ("Fix proven library" "Enable ECH" "Full OCI blob upload"))))
@@ -115,7 +115,8 @@
        (session-2026-01-25c . "Documentation: E2E-TEST-RESULTS.md, IMPLEMENTATION-STATUS.md, SESSION-SUMMARY.md")
        (session-2026-01-25d . "CLI wiring: Run_Fetch and Run_Push connected to backend operations")
        (session-2026-01-25e . "Live testing: Fixed curl params, localhost port parsing, ECH disabled, ct fetch working")
-       (session-2026-01-25f . "Status: 48/48 tests passing (100%), fetch working live, push debugging, 72% complete")))))
+       (session-2026-01-25f . "Status: 48/48 tests passing (100%), fetch working live, push debugging, 72% complete")
+       (session-2026-01-25g . "Push validation: ct push working, round-trip fetch/push verified, debug logging added, 78% complete")))))
 
 ;; Helper functions for querying state
 
