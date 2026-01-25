@@ -8,6 +8,7 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Directories;
 with Ada.Strings.Fixed;
 with Ada.Environment_Variables;
+with Ada.Exceptions;
 with Interfaces;
 with GNAT.OS_Lib;
 with CT_Errors;
@@ -768,28 +769,7 @@ package body Cerro_CLI is
                         Repository => To_String (Ref.Repository),
                         Reference  => Reference_To_Pull);
 
-                     if Pull_Res.Error = Not_Implemented then
-                        Put_Line ("");
-                        Put_Line ("Fetch operation prepared but not yet implemented.");
-                        Put_Line ("");
-                        Put_Line ("Implementation roadmap:");
-                        Put_Line ("  1. HTTP client integration (AWS.Client or similar)");
-                        Put_Line ("  2. Pull manifest from registry");
-                        Put_Line ("  3. Parse manifest to extract blob descriptors");
-                        Put_Line ("  4. Pull each blob (layers) with streaming download");
-                        Put_Line ("  5. Verify blob digests during download");
-                        Put_Line ("  6. Package blobs + manifest as .ctp tarball");
-                        Put_Line ("  7. Verify final bundle integrity");
-                        Put_Line ("");
-                        Put_Line ("When implemented, this will:");
-                        Put_Line ("  ✓ Download all container layers from registry");
-                        Put_Line ("  ✓ Download attestations if present");
-                        Put_Line ("  ✓ Create verified .ctp bundle");
-                        Put_Line ("  ✓ Support digest-based pulls for reproducibility");
-                        Put_Line ("");
-                        Set_Exit_Status (CT_Errors.Exit_General_Failure);
-                        return;
-                     elsif Pull_Res.Error /= CT_Registry.Success then
+                     if Pull_Res.Error /= CT_Registry.Success then
                         Put_Line ("✗ Pull failed: " & Error_Message (Pull_Res.Error));
 
                         case Pull_Res.Error is
@@ -813,20 +793,48 @@ package body Cerro_CLI is
                         Put_Line ("  Layers: " & Natural'Image (Natural (Pull_Res.Manifest.Layers.Length)));
                      end if;
 
-                     --  Step 7: Pull blobs
-                     --  TODO: Iterate over Pull_Res.Manifest.Layers and download each blob
+                     --  Step 7: Save manifest to file (simple .ctp format for MVP)
+                     --  For now, save raw JSON manifest. Future: full OCI layout with blobs
+                     declare
+                        use Ada.Text_IO;
+                        Output_File : File_Type;
+                        Output_Str  : constant String := To_String (Output_Path);
+                     begin
+                        Create (Output_File, Out_File, Output_Str);
+                        Put_Line (Output_File, "# Cerro Torre Bundle v0.2");
+                        Put_Line (Output_File, "# Manifest digest: " & To_String (Pull_Res.Digest));
+                        Put_Line (Output_File, "# Registry: " & To_String (Ref.Registry));
+                        Put_Line (Output_File, "# Repository: " & To_String (Ref.Repository));
+                        Put_Line (Output_File, "# Reference: " & Reference_To_Pull);
+                        Put_Line (Output_File, "");
+                        Put_Line (Output_File, "# Manifest JSON:");
+                        Put_Line (Output_File, To_String (Pull_Res.Raw_Json));
+                        Close (Output_File);
 
-                     --  Step 8: Package as .ctp tarball
-                     --  TODO: Create OCI layout directory structure and tar it
+                        Put_Line ("✓ Fetched to " & Output_Str);
+                        Put_Line ("  Manifest digest: " & To_String (Pull_Res.Digest));
 
-                     Put_Line ("✓ Fetched to " & To_String (Output_Path));
-                     Put_Line ("  Manifest digest: " & To_String (Pull_Res.Digest));
+                        if Verbose then
+                           declare
+                              use Ada.Directories;
+                              Size_Bytes : constant File_Size := Size (Output_Str);
+                           begin
+                              Put_Line ("  Size: " & File_Size'Image (Size_Bytes) & " bytes");
+                           end;
+                           Put_Line ("");
+                           Put_Line ("Note: This is a manifest-only bundle (MVP).");
+                           Put_Line ("Full implementation will include:");
+                           Put_Line ("  - All container layers (blobs)");
+                           Put_Line ("  - OCI layout directory structure");
+                           Put_Line ("  - Attestations and signatures");
+                        end if;
 
-                     if Verbose then
-                        Put_Line ("  Size: (bundle size calculation pending)");
-                     end if;
-
-                     Set_Exit_Status (0);
+                        Set_Exit_Status (0);
+                     exception
+                        when Error : others =>
+                           Put_Line ("✗ Failed to write bundle: " & Ada.Exceptions.Exception_Message (Error));
+                           Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                     end;
                   end;
                end;
             end;
@@ -998,70 +1006,105 @@ package body Cerro_CLI is
                   end if;
                end if;
 
-               --  Step 5: Push blobs from bundle
-               --  TODO: Extract blobs from .ctp tarball and push each layer
-               --  For now, note that this step is not yet implemented
-
-               if Verbose then
-                  Put_Line ("Pushing blobs...");
-                  Put_Line ("  (Blob upload not yet implemented - OCI layer extraction pending)");
-               end if;
-
-               --  Step 6: Push manifest
-               --  TODO: Extract manifest from bundle, push to registry
+               --  Step 5: Read manifest from bundle
+               --  For MVP, .ctp is just a text file with manifest JSON
+               --  Full implementation will extract from tarball
                declare
-                  Dummy_Manifest : OCI_Manifest;
-                  Push_Res : Push_Result;
+                  use Ada.Text_IO;
+                  Bundle_File : File_Type;
+                  Manifest_JSON : Unbounded_String := Null_Unbounded_String;
+                  In_Manifest : Boolean := False;
                begin
-                  Dummy_Manifest.Schema_Version := 2;
-                  Dummy_Manifest.Media_Type := To_Unbounded_String (OCI_Manifest_V1);
+                  if Verbose then
+                     Put_Line ("Reading bundle manifest...");
+                  end if;
 
-                  Push_Res := Push_Manifest (
-                     Client     => Client,
-                     Repository => To_String (Ref.Repository),
-                     Tag        => To_String (Ref.Tag),
-                     Manifest   => Dummy_Manifest);
+                  Open (Bundle_File, In_File, To_String (Bundle_Path));
 
-                  if Push_Res.Error = Not_Implemented then
-                     Put_Line ("");
-                     Put_Line ("Push operation prepared but not yet implemented.");
-                     Put_Line ("");
-                     Put_Line ("Implementation roadmap:");
-                     Put_Line ("  1. HTTP client integration (AWS.Client or similar)");
-                     Put_Line ("  2. Extract OCI blobs from .ctp tarball");
-                     Put_Line ("  3. Push each blob with chunked upload");
-                     Put_Line ("  4. Push manifest with references to uploaded blobs");
-                     Put_Line ("  5. Add audit log entry");
-                     Put_Line ("");
-                     Put_Line ("When implemented, this will:");
-                     Put_Line ("  ✓ Upload all container layers to registry");
-                     Put_Line ("  ✓ Upload manifest with attestations");
-                     Put_Line ("  ✓ Return manifest digest for verification");
-                     Put_Line ("");
-                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  --  Parse bundle file: skip header comments, extract JSON
+                  while not End_Of_File (Bundle_File) loop
+                     declare
+                        Line : constant String := Get_Line (Bundle_File);
+                     begin
+                        --  Start of manifest JSON section
+                        if Line = "# Manifest JSON:" then
+                           In_Manifest := True;
+                        elsif In_Manifest and then Line'Length > 0 and then Line (Line'First) /= '#' then
+                           --  Accumulate JSON lines
+                           Append (Manifest_JSON, Line);
+                           Append (Manifest_JSON, ASCII.LF);
+                        end if;
+                     end;
+                  end loop;
+
+                  Close (Bundle_File);
+
+                  if Length (Manifest_JSON) = 0 then
+                     Put_Line ("✗ Error: No manifest found in bundle");
+                     Set_Exit_Status (3);
                      return;
-                  elsif Push_Res.Error /= CT_Registry.Success then
-                     Put_Line ("✗ Push failed: " & Error_Message (Push_Res.Error));
+                  end if;
 
-                     case Push_Res.Error is
-                        when Auth_Failed | Auth_Required | Forbidden =>
-                           Set_Exit_Status (1);
-                        when Network_Error | Timeout | Server_Error =>
-                           Set_Exit_Status (2);
-                        when others =>
-                           Set_Exit_Status (CT_Errors.Exit_General_Failure);
-                     end case;
-                     return;
-                  else
-                     Put_Line ("✓ Pushed to " & To_String (Destination));
-                     Put_Line ("  Digest: " & To_String (Push_Res.Digest));
+                  if Verbose then
+                     Put_Line ("✓ Manifest extracted (" &
+                               Natural'Image (Length (Manifest_JSON)) & " bytes)");
+                  end if;
+
+                  --  Step 6: Push manifest to registry
+                  declare
+                     Manifest : OCI_Manifest;  --  Minimal record (JSON passed separately)
+                     Push_Res : Push_Result;
+                  begin
+                     --  For MVP: use raw JSON (full parsing not yet implemented)
+                     Manifest.Schema_Version := 2;
+                     Manifest.Media_Type := To_Unbounded_String (OCI_Manifest_V1);
 
                      if Verbose then
-                        Put_Line ("  URL: " & To_String (Push_Res.URL));
+                        Put_Line ("Pushing manifest to registry...");
                      end if;
 
-                     Set_Exit_Status (0);
-                  end if;
+                     Push_Res := Push_Manifest (
+                        Client        => Client,
+                        Repository    => To_String (Ref.Repository),
+                        Tag           => To_String (Ref.Tag),
+                        Manifest      => Manifest,
+                        Manifest_Json => To_String (Manifest_JSON));
+
+                     if Push_Res.Error /= CT_Registry.Success then
+                        Put_Line ("✗ Push failed: " & Error_Message (Push_Res.Error));
+
+                        case Push_Res.Error is
+                           when Auth_Failed | Auth_Required | Forbidden =>
+                              Set_Exit_Status (1);
+                           when Network_Error | Timeout | Server_Error =>
+                              Set_Exit_Status (2);
+                           when others =>
+                              Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                        end case;
+                        return;
+                     else
+                        Put_Line ("✓ Pushed to " & To_String (Destination));
+                        Put_Line ("  Digest: " & To_String (Push_Res.Digest));
+
+                        if Verbose then
+                           Put_Line ("  URL: " & To_String (Push_Res.URL));
+                           Put_Line ("");
+                           Put_Line ("Note: This is an MVP implementation.");
+                           Put_Line ("  - Blobs not yet pushed (manifest-only)");
+                           Put_Line ("  - Full OCI layer support pending");
+                           Put_Line ("  - See IMPLEMENTATION-STATUS.md for roadmap");
+                        end if;
+
+                        Set_Exit_Status (0);
+                     end if;
+                  end;
+
+               exception
+                  when Error : others =>
+                     Put_Line ("✗ Failed to read bundle: " &
+                               Ada.Exceptions.Exception_Message (Error));
+                     Set_Exit_Status (3);
+                     return;
                end;
             end;
          end;
