@@ -200,7 +200,7 @@ package body CT_HTTP is
 
       --  Timeout
       Add_Arg ("--max-time");
-      Add_Arg (Positive'Image (Config.Timeout_Seconds));
+      Add_Arg (Ada.Strings.Fixed.Trim (Positive'Image (Config.Timeout_Seconds), Ada.Strings.Both));
 
       --  TLS verification
       if not Config.Verify_TLS then
@@ -211,7 +211,7 @@ package body CT_HTTP is
       if Config.Follow_Redirects then
          Add_Arg ("-L");
          Add_Arg ("--max-redirs");
-         Add_Arg (Positive'Image (Config.Max_Redirects));
+         Add_Arg (Ada.Strings.Fixed.Trim (Positive'Image (Config.Max_Redirects), Ada.Strings.Both));
       end if;
 
       --  User agent

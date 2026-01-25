@@ -82,6 +82,11 @@ package body CT_Registry is
       then
          --  Allow HTTP for localhost/testing only
          Client.Base_URL := To_Unbounded_String (Registry);
+      elsif Registry'Length >= 9 and then
+            Registry (Registry'First .. Registry'First + 8) = "localhost"
+      then
+         --  localhost defaults to HTTP (for testing with local registries)
+         Client.Base_URL := To_Unbounded_String ("http://" & Registry);
       else
          --  Prepend https://
          Client.Base_URL := To_Unbounded_String ("https://" & Registry);
@@ -837,10 +842,11 @@ package body CT_Registry is
    is
       Result        : Image_Reference;
       --  TODO: Use formally verified Proven.Safe_Registry.Parse when proven library compiles
-      --  Format: [registry/]repository[:tag][@digest]
-      At_Pos : Natural;
-      Colon_Pos : Natural;
-      Slash_Pos : Natural;
+      --  Format: [registry[:port]/]repository[:tag][@digest]
+      At_Pos       : Natural;
+      Colon_Pos    : Natural;
+      Slash_Pos    : Natural;
+      Tag_Colon    : Natural := 0;  --  Colon for tag (after repository)
    begin
       --  Simple fallback parser (not formally verified)
       --  Examples:
@@ -848,6 +854,7 @@ package body CT_Registry is
       --    "nginx:1.25" -> docker.io/library/nginx:1.25
       --    "ghcr.io/user/repo:v1.0" -> as-is
       --    "ghcr.io/user/repo@sha256:abc" -> as-is
+      --    "localhost:5000/app:v1" -> localhost:5000 registry, app repo, v1 tag
 
       --  Check for @ (digest)
       At_Pos := Ada.Strings.Fixed.Index (Ref, "@");
@@ -855,25 +862,45 @@ package body CT_Registry is
          Result.Digest := To_Unbounded_String (Ref (At_Pos + 1 .. Ref'Last));
       end if;
 
-      --  Check for : (tag)
+      --  Find first slash to separate registry from repository
       declare
          Search_End : constant Natural := (if At_Pos > 0 then At_Pos - 1 else Ref'Last);
       begin
-         Colon_Pos := Ada.Strings.Fixed.Index (Ref (Ref'First .. Search_End), ":");
-         if Colon_Pos > 0 then
-            Result.Tag := To_Unbounded_String (Ref (Colon_Pos + 1 .. Search_End));
+         Slash_Pos := Ada.Strings.Fixed.Index (Ref (Ref'First .. Search_End), "/");
+
+         --  Find tag colon (only search after repository path, not in registry part)
+         if Slash_Pos > 0 then
+            --  Has slash - look for tag colon after the repository path
+            Tag_Colon := Ada.Strings.Fixed.Index (Ref (Slash_Pos + 1 .. Search_End), ":");
+            if Tag_Colon > 0 then
+               Result.Tag := To_Unbounded_String (Ref (Tag_Colon + 1 .. Search_End));
+            else
+               Result.Tag := To_Unbounded_String (Default_Tag);
+            end if;
          else
-            Result.Tag := To_Unbounded_String (Default_Tag);
+            --  No slash - look for tag colon in entire string
+            Colon_Pos := Ada.Strings.Fixed.Index (Ref (Ref'First .. Search_End), ":");
+            if Colon_Pos > 0 then
+               Result.Tag := To_Unbounded_String (Ref (Colon_Pos + 1 .. Search_End));
+               Tag_Colon := Colon_Pos;  --  For Repo_End calculation
+            else
+               Result.Tag := To_Unbounded_String (Default_Tag);
+            end if;
          end if;
       end;
 
       --  Parse registry/repository
       declare
-         Repo_End : constant Natural := (if Colon_Pos > 0 then Colon_Pos - 1 elsif At_Pos > 0 then At_Pos - 1 else Ref'Last);
+         Repo_End : constant Natural :=
+            (if Tag_Colon > 0 then Tag_Colon - 1
+             elsif At_Pos > 0 then At_Pos - 1
+             else Ref'Last);
       begin
-         Slash_Pos := Ada.Strings.Fixed.Index (Ref (Ref'First .. Repo_End), "/");
-         if Slash_Pos > 0 and then Ada.Strings.Fixed.Index (Ref (Ref'First .. Slash_Pos - 1), ".") > 0 then
-            --  Has registry (contains dot before first slash)
+         if Slash_Pos > 0 and then
+            (Ada.Strings.Fixed.Index (Ref (Ref'First .. Slash_Pos - 1), ".") > 0 or else
+             Ada.Strings.Fixed.Index (Ref (Ref'First .. Slash_Pos - 1), ":") > 0)
+         then
+            --  Has registry (contains dot or colon [port] before first slash)
             Result.Registry := To_Unbounded_String (Ref (Ref'First .. Slash_Pos - 1));
             Result.Repository := To_Unbounded_String (Ref (Slash_Pos + 1 .. Repo_End));
          else

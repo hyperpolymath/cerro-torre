@@ -107,8 +107,8 @@ procedure CT_Test_E2E is
       Test ("Default config uses HTTP auto-negotiation",
             Config.Protocol_Version = HTTP_Auto);
 
-      Test ("Default config enables ECH (privacy)",
-            Config.Enable_ECH = True);
+      Test ("Default config disables ECH for MVP (requires modern curl)",
+            Config.Enable_ECH = False);
 
       Test ("Default config enables DANE (security)",
             Config.DNS_Sec.Enable_DANE = True);

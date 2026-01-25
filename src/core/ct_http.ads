@@ -174,7 +174,7 @@ is
       Follow_Redirects  => True,
       Max_Redirects     => 5,
       Protocol_Version  => HTTP_Auto,  --  Let curl negotiate best version
-      Enable_ECH        => True,       --  Privacy enhancement
+      Enable_ECH        => False,      --  Disabled for MVP (requires modern curl)
       Enable_Alt_Svc    => True,       --  Allow HTTP/3 upgrade
       DNS_Sec           => Default_DNS_Security,  --  DANE enabled opportunistically
       Proxy             => No_Proxy_Config,
