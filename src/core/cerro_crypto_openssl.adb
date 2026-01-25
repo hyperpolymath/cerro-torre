@@ -7,6 +7,7 @@ pragma SPARK_Mode (Off);
 with Ada.Text_IO;
 with Ada.Directories;
 with Ada.Calendar;
+with Ada.Numerics.Discrete_Random;
 with GNAT.OS_Lib;
 with Ada.Strings.Fixed;
 with Interfaces;
@@ -19,11 +20,28 @@ package body Cerro_Crypto_OpenSSL is
    use Ada.Strings.Fixed;
    use Interfaces;
 
-   function Get_Unique_ID return String is
-      Now : constant Time := Clock;
-      Seconds_Since_Epoch : constant Duration := Now - Time_Of (1970, 1, 1);
+   --  Helper to free argument arrays
+   procedure Free_Args (Args : in out Argument_List_Access) is
    begin
-      return Trim (Duration'Image (Seconds_Since_Epoch), Ada.Strings.Both);
+      if Args /= null then
+         for I in Args'Range loop
+            Free (Args (I));
+         end loop;
+         Free (Args);
+      end if;
+   end Free_Args;
+
+   --  Generate cryptographically random unique ID for temp directories
+   function Get_Unique_ID return String is
+      subtype Random_Range is Positive range 100_000_000 .. 999_999_999;
+      package Random_Positive is new Ada.Numerics.Discrete_Random (Random_Range);
+      use Random_Positive;
+      Gen : Generator;
+      ID  : Positive;
+   begin
+      Reset (Gen);  --  Seeds from /dev/urandom on Unix systems
+      ID := Random (Gen);
+      return Trim (Positive'Image (ID), Ada.Strings.Both);
    end Get_Unique_ID;
 
    ---------------------
@@ -55,9 +73,16 @@ package body Cerro_Crypto_OpenSSL is
       end;
 
       --  Step 1: Generate Ed25519 private key
-      Args := Argument_String_To_List ("genpkey -algorithm ED25519 -out " & Private_File);
+      --  SECURITY: Use explicit argument array to prevent command injection
+      Args := new Argument_List'(
+         new String'("genpkey"),
+         new String'("-algorithm"),
+         new String'("ED25519"),
+         new String'("-out"),
+         new String'(Private_File)
+      );
       Spawn ("/usr/bin/openssl", Args.all, Success_Flag);
-      Free (Args);
+      Free_Args (Args);
 
       if not Success_Flag then
          Ada.Directories.Delete_Tree (Temp_Dir);
@@ -65,10 +90,16 @@ package body Cerro_Crypto_OpenSSL is
       end if;
 
       --  Step 2: Extract public key
-      Args := Argument_String_To_List ("pkey -in " & Private_File &
-                                       " -pubout -out " & Public_File);
+      Args := new Argument_List'(
+         new String'("pkey"),
+         new String'("-in"),
+         new String'(Private_File),
+         new String'("-pubout"),
+         new String'("-out"),
+         new String'(Public_File)
+      );
       Spawn ("/usr/bin/openssl", Args.all, Success_Flag);
-      Free (Args);
+      Free_Args (Args);
 
       if not Success_Flag then
          Ada.Directories.Delete_Tree (Temp_Dir);
@@ -76,10 +107,17 @@ package body Cerro_Crypto_OpenSSL is
       end if;
 
       --  Step 3: Convert private key to raw format
-      Args := Argument_String_To_List ("pkey -in " & Private_File &
-                                       " -outform DER -out " & Raw_Priv_File);
+      Args := new Argument_List'(
+         new String'("pkey"),
+         new String'("-in"),
+         new String'(Private_File),
+         new String'("-outform"),
+         new String'("DER"),
+         new String'("-out"),
+         new String'(Raw_Priv_File)
+      );
       Spawn ("/usr/bin/openssl", Args.all, Success_Flag);
-      Free (Args);
+      Free_Args (Args);
 
       if not Success_Flag then
          Ada.Directories.Delete_Tree (Temp_Dir);
@@ -87,10 +125,18 @@ package body Cerro_Crypto_OpenSSL is
       end if;
 
       --  Step 4: Convert public key to raw format
-      Args := Argument_String_To_List ("pkey -pubin -in " & Public_File &
-                                       " -outform DER -out " & Raw_Pub_File);
+      Args := new Argument_List'(
+         new String'("pkey"),
+         new String'("-pubin"),
+         new String'("-in"),
+         new String'(Public_File),
+         new String'("-outform"),
+         new String'("DER"),
+         new String'("-out"),
+         new String'(Raw_Pub_File)
+      );
       Spawn ("/usr/bin/openssl", Args.all, Success_Flag);
-      Free (Args);
+      Free_Args (Args);
 
       if not Success_Flag then
          Ada.Directories.Delete_Tree (Temp_Dir);
@@ -199,10 +245,17 @@ package body Cerro_Crypto_OpenSSL is
       end;
 
       --  Step 2: Convert raw key to PEM format
-      Args := Argument_String_To_List ("pkey -inform DER -in " & Raw_Key_File &
-                                       " -out " & Key_File);
+      Args := new Argument_List'(
+         new String'("pkey"),
+         new String'("-inform"),
+         new String'("DER"),
+         new String'("-in"),
+         new String'(Raw_Key_File),
+         new String'("-out"),
+         new String'(Key_File)
+      );
       Spawn ("/usr/bin/openssl", Args.all, Success_Flag);
-      Free (Args);
+      Free_Args (Args);
 
       if not Success_Flag then
          Ada.Directories.Delete_Tree (Temp_Dir);
@@ -219,11 +272,18 @@ package body Cerro_Crypto_OpenSSL is
       end;
 
       --  Step 4: Sign the message
-      Args := Argument_String_To_List ("pkeyutl -sign -inkey " & Key_File &
-                                       " -in " & Message_File &
-                                       " -out " & Sig_File);
+      Args := new Argument_List'(
+         new String'("pkeyutl"),
+         new String'("-sign"),
+         new String'("-inkey"),
+         new String'(Key_File),
+         new String'("-in"),
+         new String'(Message_File),
+         new String'("-out"),
+         new String'(Sig_File)
+      );
       Spawn ("/usr/bin/openssl", Args.all, Success_Flag);
-      Free (Args);
+      Free_Args (Args);
 
       if not Success_Flag then
          Ada.Directories.Delete_Tree (Temp_Dir);
@@ -288,10 +348,14 @@ package body Cerro_Crypto_OpenSSL is
          elsif C >= 'A' and C <= 'F' then
             return Unsigned_8 (Character'Pos (C) - Character'Pos ('A') + 10);
          else
-            return 0;
+            --  SECURITY: Strict validation - fail on invalid hex
+            raise Constraint_Error with "Invalid hex character: " & C;
          end if;
       end Hex_Digit;
    begin
+      if Hex'Length /= 2 then
+         raise Constraint_Error with "Hex_To_Byte requires exactly 2 characters";
+      end if;
       return Hex_Digit (Hex (Hex'First)) * 16 + Hex_Digit (Hex (Hex'First + 1));
    end Hex_To_Byte;
 
