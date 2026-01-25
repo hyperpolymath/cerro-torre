@@ -22,8 +22,8 @@ pragma SPARK_Mode (Off);  --  SPARK mode off pending HTTP client bindings
 with Ada.Strings.Fixed;
 with CT_HTTP;
 with CT_JSON;
-with Proven.Safe_Registry;
-with Proven.Safe_Digest;
+--  with Proven.Safe_Registry;  --  Temporarily disabled
+--  with Proven.Safe_Digest;     --  Temporarily disabled
 with Cerro_Crypto;
 
 package body CT_Registry is
@@ -811,33 +811,56 @@ package body CT_Registry is
    function Parse_Reference (Ref : String) return Image_Reference
    is
       Result        : Image_Reference;
-      Proven_Result : Proven.Safe_Registry.Parse_Result;
-   begin
-      --  Use formally verified Proven.Safe_Registry.Parse
+      --  TODO: Use formally verified Proven.Safe_Registry.Parse when proven library compiles
       --  Format: [registry/]repository[:tag][@digest]
-      --
+      At_Pos : Natural;
+      Colon_Pos : Natural;
+      Slash_Pos : Natural;
+   begin
+      --  Simple fallback parser (not formally verified)
       --  Examples:
       --    "nginx" -> docker.io/library/nginx:latest
       --    "nginx:1.25" -> docker.io/library/nginx:1.25
       --    "ghcr.io/user/repo:v1.0" -> as-is
       --    "ghcr.io/user/repo@sha256:abc" -> as-is
 
-      Proven_Result := Proven.Safe_Registry.Parse (Ref);
-
-      if not Proven_Result.Valid then
-         --  Parse failed - return defaults
-         Result.Registry   := To_Unbounded_String (Default_Registry);
-         Result.Repository := To_Unbounded_String ("library/invalid");
-         Result.Tag        := To_Unbounded_String (Default_Tag);
-         Result.Digest     := Null_Unbounded_String;
-         return Result;
+      --  Check for @ (digest)
+      At_Pos := Ada.Strings.Fixed.Index (Ref, "@");
+      if At_Pos > 0 then
+         Result.Digest := To_Unbounded_String (Ref (At_Pos + 1 .. Ref'Last));
       end if;
 
-      --  Convert from Proven.Safe_Registry.Image_Reference to CT_Registry.Image_Reference
-      Result.Registry   := Proven_Result.Reference.Registry;
-      Result.Repository := Proven_Result.Reference.Repository;
-      Result.Tag        := Proven_Result.Reference.Tag;
-      Result.Digest     := Proven_Result.Reference.Digest;
+      --  Check for : (tag)
+      declare
+         Search_End : constant Natural := (if At_Pos > 0 then At_Pos - 1 else Ref'Last);
+      begin
+         Colon_Pos := Ada.Strings.Fixed.Index (Ref (Ref'First .. Search_End), ":");
+         if Colon_Pos > 0 then
+            Result.Tag := To_Unbounded_String (Ref (Colon_Pos + 1 .. Search_End));
+         else
+            Result.Tag := To_Unbounded_String (Default_Tag);
+         end if;
+      end;
+
+      --  Parse registry/repository
+      declare
+         Repo_End : constant Natural := (if Colon_Pos > 0 then Colon_Pos - 1 elsif At_Pos > 0 then At_Pos - 1 else Ref'Last);
+      begin
+         Slash_Pos := Ada.Strings.Fixed.Index (Ref (Ref'First .. Repo_End), "/");
+         if Slash_Pos > 0 and then Ada.Strings.Fixed.Index (Ref (Ref'First .. Slash_Pos - 1), ".") > 0 then
+            --  Has registry (contains dot before first slash)
+            Result.Registry := To_Unbounded_String (Ref (Ref'First .. Slash_Pos - 1));
+            Result.Repository := To_Unbounded_String (Ref (Slash_Pos + 1 .. Repo_End));
+         else
+            --  No registry - use default
+            Result.Registry := To_Unbounded_String (Default_Registry);
+            if Slash_Pos = 0 then
+               Result.Repository := To_Unbounded_String ("library/" & Ref (Ref'First .. Repo_End));
+            else
+               Result.Repository := To_Unbounded_String (Ref (Ref'First .. Repo_End));
+            end if;
+         end if;
+      end;
 
       return Result;
    end Parse_Reference;
@@ -960,26 +983,14 @@ package body CT_Registry is
      (Content : String;
       Digest  : String) return Boolean
    is
-      Expected_Result : Proven.Safe_Digest.Parse_Result;
-      Actual_Digest   : constant String := Manifest_Digest (Content);
-      Actual_Result   : Proven.Safe_Digest.Parse_Result;
+      Actual_Digest : constant String := Manifest_Digest (Content);
    begin
-      --  Parse expected digest string (format: "algorithm:hex")
-      Expected_Result := Proven.Safe_Digest.Parse (Digest);
-      if not Expected_Result.Valid then
-         return False;  --  Invalid digest format
-      end if;
+      --  TODO: Use formally verified Proven.Safe_Digest.Verify when proven library compiles
+      --  For now, simple string comparison (NOT constant-time, not timing-attack-safe)
+      --  Format: "algorithm:hex"
 
-      --  Compute actual digest and parse
-      Actual_Result := Proven.Safe_Digest.Parse (Actual_Digest);
-      if not Actual_Result.Valid then
-         return False;  --  Should never happen with our own digest
-      end if;
-
-      --  Use formally verified constant-time comparison
-      return Proven.Safe_Digest.Verify (
-         Expected => Expected_Result.Digest_Value,
-         Actual   => Actual_Result.Digest_Value);
+      --  Simple comparison
+      return Actual_Digest = Digest;
    end Verify_Digest;
 
    function Error_Message (E : Registry_Error) return String is

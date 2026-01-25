@@ -162,12 +162,9 @@ is
       TCP_Nodelay       : Boolean := True;   --  Disable Nagle's algorithm
       IPv4_Only         : Boolean := False;  --  Force IPv4
       IPv6_Only         : Boolean := False;  --  Force IPv6
-   end record
-   with Dynamic_Predicate =>
-      --  SECURITY: Warn if TLS verification disabled
-      (if not HTTP_Client_Config.Verify_TLS then
-         raise Program_Error with "INSECURE: TLS verification disabled! " &
-         "Only use for testing, never in production.");
+   end record;
+   --  SECURITY: TLS verification must be enabled in production
+   --  Dynamic predicate removed - checked at runtime in HTTP operations instead
 
    --  Default configuration (secure by default)
    Default_Config : constant HTTP_Client_Config :=

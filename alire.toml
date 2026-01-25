@@ -31,8 +31,9 @@ ada_toml = "*"
 json = "*"
 
 # For formally verified primitives (registry parsing, digest ops, HTTP utils)
+# Version omitted - using local pin (see [[pins]] section below)
 [[depends-on]]
-proven = "^0.9.0"
+proven = "*"
 
 # For HTTP client (source fetching, registry, transparency) - v0.2
 # Temporarily disabled due to dependency conflicts with gnatcoll 25

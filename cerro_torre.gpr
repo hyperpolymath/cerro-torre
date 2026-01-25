@@ -4,6 +4,7 @@
 --  Or directly: gprbuild -P cerro_torre.gpr
 
 with "config/cerro_torre_config.gpr";
+--  with "proven";  --  Temporarily disabled due to compilation errors in proven library
 
 project Cerro_Torre is
 
