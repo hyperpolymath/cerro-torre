@@ -1,4 +1,4 @@
-;; SPDX-License-Identifier: PMPL-1.0-or-later
+;; SPDX-License-Identifier: MPL-2.0-or-later
 ;; META.scm - Project metadata and architectural decisions for Cerro Torre
 
 (define project-meta

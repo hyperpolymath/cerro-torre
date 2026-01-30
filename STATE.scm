@@ -1,4 +1,4 @@
-;; SPDX-License-Identifier: PMPL-1.0-or-later
+;; SPDX-License-Identifier: MPL-2.0-or-later
 ;; STATE.scm - Current project state for Cerro Torre
 
 (define project-state
@@ -120,7 +120,8 @@
        (session-2026-01-25e . "Live testing: Fixed curl params, localhost port parsing, ECH disabled, ct fetch working")
        (session-2026-01-25f . "Status: 48/48 tests passing (100%), fetch working live, push debugging, 72% complete")
        (session-2026-01-25g . "Push validation: ct push working, round-trip fetch/push verified, debug logging added, 78% complete")
-       (session-2026-01-25h . "Phase 3 start: Debug logging configurable, Ed25519 signing module created via OpenSSL, 82% complete")))))
+       (session-2026-01-25h . "Phase 3 start: Debug logging configurable, Ed25519 signing module created via OpenSSL, 82% complete")
+       (session-2026-01-28-security . "Security audit completed: 40% svalinn-project compliant, ML-DSA-87 stubbed, security roadmap defined (Phase 1-4), SECURITY.md and ROADMAP.adoc updated with PQ crypto timeline, liboqs bindings scaffolded but not compiled")))))
 
 ;; Helper functions for querying state
 
