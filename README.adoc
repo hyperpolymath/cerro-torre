@@ -1,9 +1,15 @@
 = Cerro Torre
 
-image:https://img.shields.io/badge/License-MPL_2.0-blue.svg[MPL-2.0,link="https://opensource.org/licenses/MPL-2.0"]
-image:https://img.shields.io/badge/Philosophy-Palimpsest-purple.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-licence"]
+image:https://img.shields.io/badge/License-MPL_2.0-blue.svg[MPL-2.0-or-later,link="https://opensource.org/licenses/MPL-2.0"]
+image:https://img.shields.io/badge/Philosophy-Palimpsest-indigo.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-license"]
 
-// SPDX-License-Identifier: PMPL-1.0
+== License & Philosophy
+
+This project must declare **MPL-2.0-or-later** for platform/tooling compatibility.
+
+Philosophy: **Palimpsest**. The Palimpsest-MPL (PMPL) text is provided in `license/PMPL-1.0.txt`, and the canonical source is the palimpsest-license repository.
+
+// SPDX-License-Identifier: MPL-2.0-or-later
 // SPDX-FileCopyrightText: 2025 Jonathan D.A. Jewell
 
 :toc: preamble
@@ -146,10 +152,32 @@ See [spec/manifest-format.md](spec/manifest-format.md) for the full specificatio
 
 === Security
 
+Cerro Torre provides cryptographic supply chain guarantees through formal verification and post-quantum cryptography:
+
+==== Implemented (Production Ready)
+
+- *Formal Verification*: Core crypto operations verified with Ada/SPARK proofs
+- *Ed25519 Signatures*: RFC 8032 compliant digital signatures (CT-SIG-01)
+- *Strong Hashing*: SHA-256/512 (FIPS 180-4), BLAKE3 for fast manifest hashing
+- *TLS 1.3*: Modern encrypted transport for registry operations
 - *SELinux Enforcing*: First-class SELinux support with auto-generated per-container policies
-- *Threshold Signing*: k-of-n keyholders required for releases; no single point of trust
-- *Federated Transparency*: Multiple independent log operators; threshold agreement required
+- *Threshold Signing*: k-of-n keyholders required for releases (FROST-Ed25519)
+- *Federated Transparency*: Multiple independent log operators (Rekor integration)
 - *Reproducible Builds*: Any party can rebuild and verify packages
+
+==== In Development (Security Roadmap)
+
+- *Post-Quantum Signatures*: ML-DSA-87 implementation (Phase 1, Q3 2026) - API defined, liboqs bindings present
+- *Hybrid Signatures*: CT-SIG-02 (Ed25519 + ML-DSA-87) for quantum resistance
+- *Enhanced Algorithms*: Ed448 (Phase 1), SPHINCS+ (Phase 1), BLAKE3-512 (Phase 2)
+- *Modern Transport*: HTTP/3 and QUIC (Phase 3, Q1 2027)
+- *Post-Quantum TLS*: Kyber-1024 KEM when curl/OpenSSL support available
+
+**Current Svalinn-Project Compliance**: 40% (see link:SECURITY.md[SECURITY.md] and link:docs/MISSING-SECURITY-COMPONENTS.adoc[security audit])
+
+**Protection Against**: Supply chain tampering, unauthorized signers, quantum computer attacks (roadmap), man-in-the-middle attacks
+
+**See Also**: link:SECURITY.md[Security Policy], link:docs/ROADMAP.adoc[Security Implementation Timeline]
 
 == Licensing
 
