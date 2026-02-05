@@ -13,9 +13,11 @@ tb := if `command -v toolbox >/dev/null 2>&1 && echo yes || echo no` == "yes" { 
 default:
     @just --list --unsorted
 
-# Build the project
+# Build the project (Ada + Rust signing CLI)
 build:
     alr build
+    cargo build --release
+    cp target/release/cerro-sign bin/
 
 # Run tests
 test:
