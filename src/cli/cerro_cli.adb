@@ -9,6 +9,7 @@ with Ada.Directories;
 with Ada.Strings.Fixed;
 with Ada.Environment_Variables;
 with Ada.Exceptions;
+with Ada.Calendar;
 with Interfaces;
 with GNAT.OS_Lib;
 with CT_Errors;
@@ -19,6 +20,7 @@ with Cerro_Verify;
 with Cerro_Explain;
 with Cerro_Trust_Store;
 with Cerro_Runtime;
+with Cerro_Crypto_OpenSSL;
 
 package body Cerro_CLI is
 
@@ -235,24 +237,261 @@ package body Cerro_CLI is
    ------------
 
    procedure Run_Keygen is
+      use Cerro_Crypto_OpenSSL;
+      use Cerro_Trust_Store;
+      use Ada.Directories;
+
+      Key_Id      : Unbounded_String := To_Unbounded_String ("ct-key-default");
+      Suite       : Unbounded_String := To_Unbounded_String ("CT-SIG-01");
+      Output_Dir  : Unbounded_String := Null_Unbounded_String;
+      Private_Key : Ed25519_Private_Key;
+      Public_Key  : Ed25519_Public_Key;
+      Success     : Boolean;
    begin
-      Put_Line ("Usage: ct keygen [--id <name>] [--suite <suite-id>]");
-      Put_Line ("");
-      Put_Line ("Generate a new signing keypair.");
-      Put_Line ("");
-      Put_Line ("Options:");
-      Put_Line ("  --id <name>        Key identifier (default: auto-generated)");
-      Put_Line ("  --suite <suite>    Crypto suite (default: CT-SIG-01)");
-      Put_Line ("  --output <dir>     Output directory");
-      Put_Line ("  --no-password      Don't encrypt private key (not recommended)");
-      Put_Line ("");
-      Put_Line ("Suites:");
-      Put_Line ("  CT-SIG-01   Ed25519 (classical, default)");
-      Put_Line ("  CT-SIG-02   Ed25519 + ML-DSA-87 (hybrid, v0.2)");
-      Put_Line ("  CT-SIG-03   ML-DSA-87 (post-quantum only, v0.2)");
-      Put_Line ("");
-      Put_Line ("(Not yet implemented)");
-      Set_Exit_Status (CT_Errors.Exit_General_Failure);
+      --  Show help if no arguments
+      if Argument_Count < 1 then
+         Put_Line ("Usage: ct keygen [--id <name>] [--suite <suite-id>]");
+         Put_Line ("");
+         Put_Line ("Generate a new signing keypair.");
+         Put_Line ("");
+         Put_Line ("Options:");
+         Put_Line ("  --id <name>        Key identifier (default: auto-generated)");
+         Put_Line ("  --suite <suite>    Crypto suite (default: CT-SIG-01)");
+         Put_Line ("  --output <dir>     Output directory (default: ~/.config/cerro-torre/keys/)");
+         Put_Line ("");
+         Put_Line ("Suites:");
+         Put_Line ("  CT-SIG-01   Ed25519 (classical, default)");
+         Put_Line ("  CT-SIG-02   Ed25519 + ML-DSA-87 (hybrid, v0.2 - not yet)");
+         Put_Line ("  CT-SIG-03   ML-DSA-87 (post-quantum only, v0.2 - not yet)");
+         Put_Line ("");
+         Put_Line ("Examples:");
+         Put_Line ("  ct keygen");
+         Put_Line ("  ct keygen --id my-signing-key");
+         Put_Line ("  ct keygen --id prod-2026 --output /secure/keys/");
+         Set_Exit_Status (0);
+         return;
+      end if;
+
+      --  Parse arguments
+      declare
+         I : Positive := 2;  --  Skip "keygen" command
+      begin
+         while I <= Argument_Count loop
+            declare
+               Arg : constant String := Argument (I);
+            begin
+               if Arg = "--id" and then I < Argument_Count then
+                  Key_Id := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               elsif Arg = "--suite" and then I < Argument_Count then
+                  Suite := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               elsif Arg = "--output" and then I < Argument_Count then
+                  Output_Dir := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               else
+                  Put_Line ("Unknown argument: " & Arg);
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  return;
+               end if;
+            end;
+         end loop;
+      end;
+
+      --  Only CT-SIG-01 (Ed25519) supported in MVP
+      if To_String (Suite) /= "CT-SIG-01" then
+         Put_Line ("✗ Only CT-SIG-01 (Ed25519) is supported in current version");
+         Put_Line ("  Post-quantum suites (CT-SIG-02, CT-SIG-03) coming in v0.2");
+         Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         return;
+      end if;
+
+      --  Determine output directory
+      if Length (Output_Dir) = 0 then
+         declare
+            Home : constant String := Ada.Environment_Variables.Value ("HOME", "/tmp");
+         begin
+            Output_Dir := To_Unbounded_String (Home & "/.config/cerro-torre/keys/");
+         end;
+      end if;
+
+      --  Create output directory if needed
+      begin
+         if not Exists (To_String (Output_Dir)) then
+            Create_Path (To_String (Output_Dir));
+         end if;
+      exception
+         when others =>
+            Put_Line ("✗ Failed to create directory: " & To_String (Output_Dir));
+            Set_Exit_Status (CT_Errors.Exit_General_Failure);
+            return;
+      end;
+
+      --  Generate Ed25519 keypair
+      Put_Line ("Generating Ed25519 keypair...");
+
+      --  MVP: Use shell script wrapper until Spawn issue is debugged
+      --  TODO: Replace with direct OpenSSL bindings once GNAT.OS_Lib.Spawn is fixed
+      declare
+         use GNAT.OS_Lib;
+         Script_Path : constant String := To_String (Output_Dir) & ".keygen.sh";
+         Script_File : Ada.Text_IO.File_Type;
+         Priv_Path   : constant String := To_String (Output_Dir) & To_String (Key_Id) & ".priv";
+         Pub_Path    : constant String := To_String (Output_Dir) & To_String (Key_Id) & ".pub";
+         Args        : Argument_List_Access;
+      begin
+         --  Create temporary shell script
+         Ada.Text_IO.Create (Script_File, Ada.Text_IO.Out_File, Script_Path);
+         Ada.Text_IO.Put_Line (Script_File, "#!/bin/bash");
+         Ada.Text_IO.Put_Line (Script_File, "set -e");
+         Ada.Text_IO.Put_Line (Script_File, "TEMP_DIR=$(mktemp -d)");
+         Ada.Text_IO.Put_Line (Script_File, "cd ""$TEMP_DIR""");
+         Ada.Text_IO.Put_Line (Script_File, "openssl genpkey -algorithm ED25519 -out private.pem 2>/dev/null");
+         Ada.Text_IO.Put_Line (Script_File, "openssl pkey -in private.pem -pubout -out public.pem 2>/dev/null");
+         Ada.Text_IO.Put_Line (Script_File,
+            "openssl pkey -in private.pem -outform DER -out private.der 2>/dev/null");
+         Ada.Text_IO.Put_Line (Script_File,
+            "openssl pkey -pubin -in public.pem -outform DER -out public.der 2>/dev/null");
+         Ada.Text_IO.Put_Line (Script_File,
+            "tail -c 32 private.der | hexdump -v -e '/1 ""%02x""' > seed.hex");
+         Ada.Text_IO.Put_Line (Script_File,
+            "tail -c 32 public.der | hexdump -v -e '/1 ""%02x""' > pub.hex");
+         Ada.Text_IO.Put_Line (Script_File,
+            "cat seed.hex pub.hex > """ & Priv_Path & """");
+         Ada.Text_IO.Put_Line (Script_File,
+            "cp pub.hex """ & Pub_Path & """");
+         Ada.Text_IO.Put_Line (Script_File, "cd /");
+         Ada.Text_IO.Put_Line (Script_File, "rm -rf ""$TEMP_DIR""");
+         Ada.Text_IO.Close (Script_File);
+
+         --  Make executable
+         Args := new Argument_List'(
+            new String'("+x"),
+            new String'(Script_Path)
+         );
+         Spawn ("/usr/bin/chmod", Args.all, Success);
+         Free (Args (1));
+         Free (Args (2));
+         Free (Args);
+
+         --  Execute script
+         Args := new Argument_List'(1 => new String'(Script_Path));
+         Spawn ("/bin/bash", Args.all, Success);
+         Free (Args (1));
+         Free (Args);
+
+         --  Delete script
+         begin
+            Ada.Directories.Delete_File (Script_Path);
+         exception
+            when others => null;
+         end;
+
+         if not Success or else not Ada.Directories.Exists (Priv_Path) then
+            Put_Line ("✗ Keypair generation failed");
+            Set_Exit_Status (CT_Errors.Exit_General_Failure);
+            return;
+         end if;
+
+         --  Read generated keys
+         declare
+            Priv_File : Ada.Text_IO.File_Type;
+            Pub_File  : Ada.Text_IO.File_Type;
+            Priv_Hex  : String (1 .. 128);
+            Pub_Hex   : String (1 .. 64);
+            Last      : Natural;
+         begin
+            Ada.Text_IO.Open (Priv_File, Ada.Text_IO.In_File, Priv_Path);
+            Ada.Text_IO.Get_Line (Priv_File, Priv_Hex, Last);
+            Ada.Text_IO.Close (Priv_File);
+
+            Ada.Text_IO.Open (Pub_File, Ada.Text_IO.In_File, Pub_Path);
+            Ada.Text_IO.Get_Line (Pub_File, Pub_Hex, Last);
+            Ada.Text_IO.Close (Pub_File);
+
+            --  Convert hex to binary
+            Hex_To_Private_Key (Priv_Hex, Private_Key, Success);
+            if not Success then
+               Put_Line ("✗ Invalid private key format");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            Hex_To_Public_Key (Pub_Hex, Public_Key, Success);
+            if not Success then
+               Put_Line ("✗ Invalid public key format");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            --  Delete .pub file, keep .priv
+            Ada.Directories.Delete_File (Pub_Path);
+         end;
+      exception
+         when others =>
+            Put_Line ("✗ Keypair generation failed");
+            Set_Exit_Status (CT_Errors.Exit_General_Failure);
+            return;
+      end;
+
+      --  Private key already saved by shell script
+      Put_Line ("✓ Private key saved: " & To_String (Output_Dir) & To_String (Key_Id) & ".priv");
+      Put_Line ("  ⚠️  KEEP THIS FILE SECURE - it can sign bundles as you!");
+
+      --  Import public key to trust store
+      declare
+         Pub_Hex    : constant String := Public_Key_To_Hex (Public_Key);
+         Result     : Store_Result;
+      begin
+         --  Initialize trust store if needed
+         if not Is_Initialized then
+            Initialize;
+         end if;
+
+         --  Import public key
+         Result := Import_Key_Hex (Pub_Hex, To_String (Key_Id));
+
+         if Result = OK then
+            Put_Line ("✓ Public key imported to trust store");
+
+            --  Set trust to "ultimate" (it's our own key)
+            Result := Set_Trust (To_String (Key_Id), Ultimate);
+            if Result = OK then
+               Put_Line ("✓ Trust level set to 'ultimate'");
+            end if;
+
+            --  Compute and show fingerprint
+            declare
+               Fingerprint : constant String := Compute_Fingerprint (Pub_Hex);
+            begin
+               Put_Line ("");
+               Put_Line ("Key details:");
+               Put_Line ("  ID:          " & To_String (Key_Id));
+               Put_Line ("  Suite:       " & To_String (Suite));
+               Put_Line ("  Fingerprint: " & Fingerprint);
+               Put_Line ("  Public key:  " & Pub_Hex);
+               Put_Line ("");
+               Put_Line ("To sign a bundle:");
+               Put_Line ("  ct pack manifest.ctp -o output.ctp --sign --key " & To_String (Key_Id));
+            end;
+
+            Set_Exit_Status (0);
+         else
+            case Result is
+               when Already_Exists =>
+                  Put_Line ("✗ Key ID already exists in trust store");
+               when IO_Error =>
+                  Put_Line ("✗ Failed to write to trust store");
+               when Invalid_Key =>
+                  Put_Line ("✗ Invalid key format");
+               when Invalid_Format =>
+                  Put_Line ("✗ Invalid key format");
+               when others =>
+                  Put_Line ("✗ Failed to import public key");
+            end case;
+            Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         end if;
+      end;
    end Run_Keygen;
 
    ---------
