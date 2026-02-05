@@ -345,7 +345,7 @@ package body Cerro_Pack is
                         TIO.Put_Line (Script_File, "echo -n '" & Manifest_Hash & "' > msg.txt");
                         --  Convert seed to DER format (add DER header + 32-byte seed)
                         TIO.Put_Line (Script_File,
-                           "printf '\\x30\\x2e\\x02\\x01\\x00\\x30\\x05\\x06\\x03\\x2b\\x65\\x70\\x04\\x22\\x04\\x20' " &
+                           "echo -ne '\x30\x2e\x02\x01\x00\x30\x05\x06\x03\x2b\x65\x70\x04\x22\x04\x20' " &
                            "> key.der");
                         TIO.Put_Line (Script_File,
                            "python3 -c ""import sys; " &
@@ -353,7 +353,7 @@ package body Cerro_Pack is
                         --  Convert DER to PEM
                         TIO.Put_Line (Script_File,
                            "openssl pkey -inform DER -in key.der -out key.pem 2>/dev/null");
-                        --  Sign message
+                        --  Sign message and write to final destination
                         TIO.Put_Line (Script_File,
                            "openssl pkeyutl -sign -inkey key.pem -in msg.txt 2>/dev/null | " &
                            "hexdump -v -e '/1 ""%02x""' > """ & Sig_Path & """");
