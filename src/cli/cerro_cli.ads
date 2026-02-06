@@ -29,6 +29,16 @@ package Cerro_CLI is
    --  Usage: ct key <list|import|export|default> [args]
    procedure Run_Key;
 
+   --  Sign a file or message with Ed25519 private key
+   --  Usage: ct sign <file> --key <key-id> [-o <sig-file>]
+   --  Produces a detached .sig file containing the Ed25519 signature.
+   procedure Run_Sign;
+
+   --  Verify a detached Ed25519 signature
+   --  Usage: ct verify-sig <file> --sig <sig-file> --key <key-id>
+   --  Exit codes: 0=valid, 2=invalid signature, 3=key not found
+   procedure Run_Verify_Sig;
+
    --  ======== v0.2 Commands (stubs) ========
 
    --  Fetch bundle from registry or create from OCI image

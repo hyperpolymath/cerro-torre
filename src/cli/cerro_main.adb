@@ -29,6 +29,10 @@ begin
       Put_Line ("  keygen                    Generate signing keypair");
       Put_Line ("  key <subcommand>          Key management (list, import, export)");
       Put_Line ("");
+      Put_Line ("Signing:");
+      Put_Line ("  sign <file> --key <id>    Sign a file with Ed25519");
+      Put_Line ("  verify-sig <file> --key   Verify a detached signature");
+      Put_Line ("");
       Put_Line ("Distribution:");
       Put_Line ("  fetch <ref> -o <file>     Fetch bundle from registry");
       Put_Line ("  push <bundle> <dest>      Push bundle to registry");
@@ -91,6 +95,12 @@ begin
 
       elsif Command = "key" then
          Cerro_CLI.Run_Key;
+
+      elsif Command = "sign" then
+         Cerro_CLI.Run_Sign;
+
+      elsif Command = "verify-sig" then
+         Cerro_CLI.Run_Verify_Sig;
 
       --  Distribution commands
       elsif Command = "fetch" then

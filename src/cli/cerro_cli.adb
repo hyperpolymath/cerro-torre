@@ -822,6 +822,449 @@ package body Cerro_CLI is
       end;
    end Run_Key;
 
+   ----------
+   -- Sign --
+   ----------
+
+   procedure Run_Sign is
+      use Cerro_Crypto_OpenSSL;
+      use Cerro_Trust_Store;
+      use Ada.Directories;
+
+      Key_Id_Str  : Unbounded_String := Null_Unbounded_String;
+      Input_Path  : Unbounded_String := Null_Unbounded_String;
+      Output_Path : Unbounded_String := Null_Unbounded_String;
+      Verbose     : Boolean := False;
+   begin
+      if Argument_Count < 2 then
+         Put_Line ("Usage: ct sign <file> --key <key-id> [-o <sig-file>]");
+         Put_Line ("");
+         Put_Line ("Sign a file with an Ed25519 private key.");
+         Put_Line ("Produces a detached .sig file with the hex-encoded signature.");
+         Put_Line ("");
+         Put_Line ("Options:");
+         Put_Line ("  --key <key-id>       Signing key ID (required, or use default)");
+         Put_Line ("  -o, --output <file>  Output signature path (default: <file>.sig)");
+         Put_Line ("  -v, --verbose        Show detailed progress");
+         Put_Line ("");
+         Put_Line ("Examples:");
+         Put_Line ("  ct sign bundle.ctp --key my-key");
+         Put_Line ("  ct sign manifest.ctp --key prod-2026 -o manifest.sig");
+         Put_Line ("  ct sign data.bin    (uses default signing key)");
+         Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         return;
+      end if;
+
+      --  First positional argument is the file to sign
+      Input_Path := To_Unbounded_String (Argument (2));
+
+      --  Parse remaining arguments
+      declare
+         I : Positive := 3;
+      begin
+         while I <= Argument_Count loop
+            declare
+               Arg : constant String := Argument (I);
+            begin
+               if (Arg = "--key" or Arg = "-k")
+                  and then I < Argument_Count
+               then
+                  Key_Id_Str := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               elsif (Arg = "-o" or Arg = "--output")
+                  and then I < Argument_Count
+               then
+                  Output_Path := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               elsif Arg = "-v" or Arg = "--verbose" then
+                  Verbose := True;
+                  I := I + 1;
+               else
+                  Put_Line ("Unknown argument: " & Arg);
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  return;
+               end if;
+            end;
+         end loop;
+      end;
+
+      --  Validate input file exists
+      if not Ada.Directories.Exists (To_String (Input_Path)) then
+         Put_Line ("Error: File not found: " & To_String (Input_Path));
+         Set_Exit_Status (CT_Errors.Exit_IO_Error);
+         return;
+      end if;
+
+      --  Use default key if none specified
+      if Length (Key_Id_Str) = 0 then
+         Initialize;
+         declare
+            Default : constant String := Get_Default_Key;
+         begin
+            if Default'Length = 0 then
+               Put_Line ("Error: No --key specified and no default key set.");
+               Put_Line ("  Generate a key: ct keygen --id <name>");
+               Put_Line ("  Set default:    ct key default <key-id>");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+            Key_Id_Str := To_Unbounded_String (Default);
+         end;
+      end if;
+
+      --  Default output path: <input>.sig
+      if Length (Output_Path) = 0 then
+         Output_Path := Input_Path & ".sig";
+      end if;
+
+      if Verbose then
+         Put_Line ("Signing: " & To_String (Input_Path));
+         Put_Line ("Key:     " & To_String (Key_Id_Str));
+         Put_Line ("Output:  " & To_String (Output_Path));
+         Put_Line ("");
+      end if;
+
+      --  Read private key from key store directory
+      declare
+         Home      : constant String :=
+            Ada.Environment_Variables.Value ("HOME", "/tmp");
+         Key_Dir   : constant String :=
+            Home & "/.config/cerro-torre/keys/";
+         Priv_Path : constant String :=
+            Key_Dir & To_String (Key_Id_Str) & ".priv";
+      begin
+         if not Ada.Directories.Exists (Priv_Path) then
+            Put_Line ("Error: Private key not found: " & Priv_Path);
+            Put_Line ("  Generate with: ct keygen --id " &
+                      To_String (Key_Id_Str));
+            Set_Exit_Status (CT_Errors.Exit_General_Failure);
+            return;
+         end if;
+
+         --  Read hex-encoded private key
+         declare
+            Priv_File : Ada.Text_IO.File_Type;
+            Priv_Hex  : String (1 .. 128);
+            Last      : Natural;
+            Priv_Key  : Ed25519_Private_Key;
+            Sig       : Ed25519_Signature;
+            OK        : Boolean;
+         begin
+            Ada.Text_IO.Open (Priv_File, Ada.Text_IO.In_File, Priv_Path);
+            Ada.Text_IO.Get_Line (Priv_File, Priv_Hex, Last);
+            Ada.Text_IO.Close (Priv_File);
+
+            if Last /= 128 then
+               Put_Line ("Error: Invalid private key format " &
+                  "(expected 128 hex chars).");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            Hex_To_Private_Key (Priv_Hex, Priv_Key, OK);
+            if not OK then
+               Put_Line ("Error: Invalid private key hex encoding.");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            --  Read file content to sign
+            declare
+               In_File    : Ada.Text_IO.File_Type;
+               Content    : Unbounded_String := Null_Unbounded_String;
+               Line_Buf   : String (1 .. 4096);
+               Line_Last  : Natural;
+               First_Line : Boolean := True;
+            begin
+               Ada.Text_IO.Open (In_File, Ada.Text_IO.In_File,
+                                 To_String (Input_Path));
+               while not Ada.Text_IO.End_Of_File (In_File) loop
+                  Ada.Text_IO.Get_Line (In_File, Line_Buf, Line_Last);
+                  if First_Line then
+                     First_Line := False;
+                  else
+                     Append (Content, ASCII.LF);
+                  end if;
+                  Append (Content, Line_Buf (1 .. Line_Last));
+               end loop;
+               Ada.Text_IO.Close (In_File);
+
+               --  Sign the content
+               if Verbose then
+                  Put_Line ("Signing" &
+                     Natural'Image (Length (Content)) & " bytes...");
+               end if;
+
+               Sign_Ed25519 (To_String (Content), Priv_Key, Sig, OK);
+
+               if not OK then
+                  Put_Line ("Error: Signing failed (OpenSSL error).");
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  return;
+               end if;
+
+               --  Write signature as hex to output file
+               declare
+                  Sig_Hex  : constant String := Signature_To_Hex (Sig);
+                  Out_File : Ada.Text_IO.File_Type;
+               begin
+                  Ada.Text_IO.Create (Out_File, Ada.Text_IO.Out_File,
+                                      To_String (Output_Path));
+                  Ada.Text_IO.Put_Line (Out_File, Sig_Hex);
+                  Ada.Text_IO.Close (Out_File);
+               end;
+
+               Put_Line ("Signature created: " &
+                  To_String (Output_Path));
+               if Verbose then
+                  Put_Line ("  Signature: " &
+                     Signature_To_Hex (Sig) (1 .. 32) & "...");
+               end if;
+               Set_Exit_Status (0);
+            end;
+         exception
+            when E : others =>
+               Put_Line ("Error reading key: " &
+                  Ada.Exceptions.Exception_Message (E));
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         end;
+      end;
+   end Run_Sign;
+
+   ----------------
+   -- Verify_Sig --
+   ----------------
+
+   procedure Run_Verify_Sig is
+      use Cerro_Crypto_OpenSSL;
+      use Cerro_Trust_Store;
+      use Ada.Directories;
+
+      Input_Path : Unbounded_String := Null_Unbounded_String;
+      Sig_Path   : Unbounded_String := Null_Unbounded_String;
+      Key_Id_Str : Unbounded_String := Null_Unbounded_String;
+      Verbose    : Boolean := False;
+   begin
+      if Argument_Count < 2 then
+         Put_Line ("Usage: ct verify-sig <file> --sig <sig-file> " &
+                   "--key <key-id>");
+         Put_Line ("");
+         Put_Line ("Verify a detached Ed25519 signature against a file.");
+         Put_Line ("");
+         Put_Line ("Options:");
+         Put_Line ("  --sig <file>     Signature file (default: <file>.sig)");
+         Put_Line ("  --key <key-id>   Public key ID in trust store");
+         Put_Line ("  -v, --verbose    Show detailed progress");
+         Put_Line ("");
+         Put_Line ("Exit codes:");
+         Put_Line ("  0   Signature valid");
+         Put_Line ("  2   Signature invalid");
+         Put_Line ("  3   Key not found in trust store");
+         Put_Line ("  11  I/O error");
+         Put_Line ("");
+         Put_Line ("Examples:");
+         Put_Line ("  ct verify-sig bundle.ctp --key upstream-nginx");
+         Put_Line ("  ct verify-sig data.bin --sig data.sig --key my-key");
+         Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         return;
+      end if;
+
+      --  First positional argument is the file to verify
+      Input_Path := To_Unbounded_String (Argument (2));
+
+      --  Parse remaining arguments
+      declare
+         I : Positive := 3;
+      begin
+         while I <= Argument_Count loop
+            declare
+               Arg : constant String := Argument (I);
+            begin
+               if Arg = "--sig"
+                  and then I < Argument_Count
+               then
+                  Sig_Path := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               elsif (Arg = "--key" or Arg = "-k")
+                  and then I < Argument_Count
+               then
+                  Key_Id_Str := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               elsif Arg = "-v" or Arg = "--verbose" then
+                  Verbose := True;
+                  I := I + 1;
+               else
+                  Put_Line ("Unknown argument: " & Arg);
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  return;
+               end if;
+            end;
+         end loop;
+      end;
+
+      --  Validate input file
+      if not Ada.Directories.Exists (To_String (Input_Path)) then
+         Put_Line ("Error: File not found: " & To_String (Input_Path));
+         Set_Exit_Status (CT_Errors.Exit_IO_Error);
+         return;
+      end if;
+
+      --  Default signature path: <input>.sig
+      if Length (Sig_Path) = 0 then
+         Sig_Path := Input_Path & ".sig";
+      end if;
+
+      if not Ada.Directories.Exists (To_String (Sig_Path)) then
+         Put_Line ("Error: Signature file not found: " &
+                   To_String (Sig_Path));
+         Set_Exit_Status (CT_Errors.Exit_IO_Error);
+         return;
+      end if;
+
+      --  Key ID is required for verification
+      if Length (Key_Id_Str) = 0 then
+         Put_Line ("Error: --key is required for verification.");
+         Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         return;
+      end if;
+
+      if Verbose then
+         Put_Line ("Verifying: " & To_String (Input_Path));
+         Put_Line ("Signature: " & To_String (Sig_Path));
+         Put_Line ("Key:       " & To_String (Key_Id_Str));
+         Put_Line ("");
+      end if;
+
+      --  Look up public key from trust store
+      Initialize;
+      declare
+         Info   : Key_Info;
+         Result : Store_Result;
+      begin
+         Result := Get_Key (To_String (Key_Id_Str), Info);
+         if Result /= OK then
+            Put_Line ("Error: Key not found in trust store: " &
+                      To_String (Key_Id_Str));
+            Put_Line ("  Import with: ct key import <file.pub> --id " &
+                      To_String (Key_Id_Str));
+            Set_Exit_Status (CT_Errors.Exit_Key_Not_Trusted);
+            return;
+         end if;
+
+         --  Parse public key hex from trust store
+         declare
+            Pub_Hex : constant String :=
+               Info.Public_Key (1 .. Info.Pubkey_Len);
+            Pub_Key : Ed25519_Public_Key;
+            OK      : Boolean;
+         begin
+            if Pub_Hex'Length /= 64 then
+               Put_Line ("Error: Invalid public key length " &
+                  "in trust store.");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            Hex_To_Public_Key (Pub_Hex, Pub_Key, OK);
+            if not OK then
+               Put_Line ("Error: Invalid public key hex " &
+                  "in trust store.");
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            --  Read signature hex from .sig file
+            declare
+               Sig_File : Ada.Text_IO.File_Type;
+               Sig_Hex  : String (1 .. 128);
+               Sig_Last : Natural;
+               Sig      : Ed25519_Signature;
+            begin
+               Ada.Text_IO.Open (Sig_File, Ada.Text_IO.In_File,
+                                 To_String (Sig_Path));
+               Ada.Text_IO.Get_Line (Sig_File, Sig_Hex, Sig_Last);
+               Ada.Text_IO.Close (Sig_File);
+
+               if Sig_Last /= 128 then
+                  Put_Line ("Error: Invalid signature format " &
+                     "(expected 128 hex chars, got" &
+                     Natural'Image (Sig_Last) & ").");
+                  Set_Exit_Status (CT_Errors.Exit_Signature_Invalid);
+                  return;
+               end if;
+
+               Hex_To_Signature (Sig_Hex, Sig, OK);
+               if not OK then
+                  Put_Line ("Error: Invalid signature hex.");
+                  Set_Exit_Status (CT_Errors.Exit_Signature_Invalid);
+                  return;
+               end if;
+
+               --  Read file content to verify
+               declare
+                  In_File    : Ada.Text_IO.File_Type;
+                  Content    : Unbounded_String := Null_Unbounded_String;
+                  Line_Buf   : String (1 .. 4096);
+                  Line_Last  : Natural;
+                  First_Line : Boolean := True;
+                  Valid      : Boolean;
+                  Verify_OK  : Boolean;
+               begin
+                  Ada.Text_IO.Open (In_File, Ada.Text_IO.In_File,
+                                    To_String (Input_Path));
+                  while not Ada.Text_IO.End_Of_File (In_File) loop
+                     Ada.Text_IO.Get_Line (In_File, Line_Buf,
+                                           Line_Last);
+                     if First_Line then
+                        First_Line := False;
+                     else
+                        Append (Content, ASCII.LF);
+                     end if;
+                     Append (Content,
+                             Line_Buf (1 .. Line_Last));
+                  end loop;
+                  Ada.Text_IO.Close (In_File);
+
+                  if Verbose then
+                     Put_Line ("Verifying" &
+                        Natural'Image (Length (Content)) &
+                        " bytes...");
+                  end if;
+
+                  Verify_Ed25519 (To_String (Content), Sig,
+                                  Pub_Key, Valid, Verify_OK);
+
+                  if not Verify_OK then
+                     Put_Line ("Error: Verification process failed " &
+                        "(OpenSSL error).");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                     return;
+                  end if;
+
+                  if Valid then
+                     Put_Line ("Signature valid.");
+                     if Verbose then
+                        Put_Line ("  Signer: " &
+                           To_String (Key_Id_Str));
+                        Put_Line ("  Fingerprint: " &
+                           Info.Fingerprint (1 .. Info.Finger_Len));
+                     end if;
+                     Set_Exit_Status (CT_Errors.Exit_Success);
+                  else
+                     Put_Line ("Signature INVALID.");
+                     Set_Exit_Status (CT_Errors.Exit_Signature_Invalid);
+                  end if;
+               end;
+            exception
+               when E : others =>
+                  Put_Line ("Error reading signature: " &
+                     Ada.Exceptions.Exception_Message (E));
+                  Set_Exit_Status (CT_Errors.Exit_IO_Error);
+            end;
+         end;
+      end;
+   end Run_Verify_Sig;
+
    -----------
    -- Fetch --
    -----------
@@ -2161,6 +2604,13 @@ package body Cerro_CLI is
    ------------
 
    procedure Run_Resign is
+      use Cerro_Crypto_OpenSSL;
+      use Cerro_Trust_Store;
+      use Ada.Directories;
+
+      Key_Id_Str  : Unbounded_String := Null_Unbounded_String;
+      Output_Path : Unbounded_String := Null_Unbounded_String;
+      Verbose     : Boolean := False;
    begin
       if Argument_Count < 2 then
          Put_Line ("Usage: ct re-sign <bundle.ctp> -k <key-id> [options]");
@@ -2169,14 +2619,12 @@ package body Cerro_CLI is
          Put_Line ("");
          Put_Line ("Options:");
          Put_Line ("  -k, --key <key-id>   New signing key (required)");
-         Put_Line ("  --add-signature      Add signature, keep existing");
-         Put_Line ("  --replace            Replace all signatures (default)");
-         Put_Line ("  -o, --output <file>  Output path (default: overwrite)");
+         Put_Line ("  -o, --output <file>  Output path (default: <bundle>.sig)");
+         Put_Line ("  -v, --verbose        Show detailed progress");
          Put_Line ("");
          Put_Line ("Examples:");
          Put_Line ("  ct re-sign nginx.ctp -k new-key-2026");
-         Put_Line ("  ct re-sign nginx.ctp -k backup-key --add-signature");
-         Put_Line ("  ct re-sign nginx.ctp -k new-key -o nginx-resigned.ctp");
+         Put_Line ("  ct re-sign nginx.ctp -k backup-key -o nginx.sig");
          Put_Line ("");
          Put_Line ("Use cases:");
          Put_Line ("  - Key rotation (old key expiring)");
@@ -2188,11 +2636,162 @@ package body Cerro_CLI is
 
       declare
          Bundle_Path : constant String := Argument (2);
+         I           : Positive := 3;
       begin
-         Put_Line ("Re-signing bundle: " & Bundle_Path);
-         Put_Line ("");
-         Put_Line ("(v0.2 - Not yet implemented)");
-         Set_Exit_Status (CT_Errors.Exit_General_Failure);
+         --  Parse arguments
+         while I <= Argument_Count loop
+            declare
+               Arg : constant String := Argument (I);
+            begin
+               if (Arg = "-k" or Arg = "--key")
+                  and then I < Argument_Count
+               then
+                  Key_Id_Str := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               elsif (Arg = "-o" or Arg = "--output")
+                  and then I < Argument_Count
+               then
+                  Output_Path := To_Unbounded_String (Argument (I + 1));
+                  I := I + 2;
+               elsif Arg = "-v" or Arg = "--verbose" then
+                  Verbose := True;
+                  I := I + 1;
+               else
+                  Put_Line ("Unknown argument: " & Arg);
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  return;
+               end if;
+            end;
+         end loop;
+
+         --  Validate bundle exists
+         if not Ada.Directories.Exists (Bundle_Path) then
+            Put_Line ("Error: Bundle not found: " & Bundle_Path);
+            Set_Exit_Status (CT_Errors.Exit_IO_Error);
+            return;
+         end if;
+
+         --  Key is required
+         if Length (Key_Id_Str) = 0 then
+            Put_Line ("Error: -k/--key is required for re-signing.");
+            Set_Exit_Status (CT_Errors.Exit_General_Failure);
+            return;
+         end if;
+
+         --  Default output: <bundle>.sig
+         if Length (Output_Path) = 0 then
+            Output_Path := To_Unbounded_String (Bundle_Path & ".sig");
+         end if;
+
+         if Verbose then
+            Put_Line ("Re-signing: " & Bundle_Path);
+            Put_Line ("New key:    " & To_String (Key_Id_Str));
+            Put_Line ("Output:     " & To_String (Output_Path));
+            Put_Line ("");
+         end if;
+
+         --  Read the private key
+         declare
+            Home      : constant String :=
+               Ada.Environment_Variables.Value ("HOME", "/tmp");
+            Key_Dir   : constant String :=
+               Home & "/.config/cerro-torre/keys/";
+            Priv_Path : constant String :=
+               Key_Dir & To_String (Key_Id_Str) & ".priv";
+         begin
+            if not Ada.Directories.Exists (Priv_Path) then
+               Put_Line ("Error: Private key not found: " & Priv_Path);
+               Put_Line ("  Generate with: ct keygen --id " &
+                         To_String (Key_Id_Str));
+               Set_Exit_Status (CT_Errors.Exit_General_Failure);
+               return;
+            end if;
+
+            declare
+               Priv_File : Ada.Text_IO.File_Type;
+               Priv_Hex  : String (1 .. 128);
+               Last      : Natural;
+               Priv_Key  : Ed25519_Private_Key;
+               Sig       : Ed25519_Signature;
+               OK        : Boolean;
+            begin
+               Ada.Text_IO.Open (Priv_File, Ada.Text_IO.In_File,
+                                 Priv_Path);
+               Ada.Text_IO.Get_Line (Priv_File, Priv_Hex, Last);
+               Ada.Text_IO.Close (Priv_File);
+
+               if Last /= 128 then
+                  Put_Line ("Error: Invalid key format.");
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  return;
+               end if;
+
+               Hex_To_Private_Key (Priv_Hex, Priv_Key, OK);
+               if not OK then
+                  Put_Line ("Error: Invalid key hex encoding.");
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                  return;
+               end if;
+
+               --  Read bundle content
+               declare
+                  In_File    : Ada.Text_IO.File_Type;
+                  Content    : Unbounded_String := Null_Unbounded_String;
+                  Line_Buf   : String (1 .. 4096);
+                  Line_Last  : Natural;
+                  First_Line : Boolean := True;
+               begin
+                  Ada.Text_IO.Open (In_File, Ada.Text_IO.In_File,
+                                    Bundle_Path);
+                  while not Ada.Text_IO.End_Of_File (In_File) loop
+                     Ada.Text_IO.Get_Line (In_File, Line_Buf,
+                                           Line_Last);
+                     if First_Line then
+                        First_Line := False;
+                     else
+                        Append (Content, ASCII.LF);
+                     end if;
+                     Append (Content, Line_Buf (1 .. Line_Last));
+                  end loop;
+                  Ada.Text_IO.Close (In_File);
+
+                  --  Sign with new key
+                  Sign_Ed25519 (To_String (Content), Priv_Key, Sig, OK);
+
+                  if not OK then
+                     Put_Line ("Error: Re-signing failed (OpenSSL).");
+                     Set_Exit_Status (CT_Errors.Exit_General_Failure);
+                     return;
+                  end if;
+
+                  --  Write new signature
+                  declare
+                     Sig_Hex  : constant String :=
+                        Signature_To_Hex (Sig);
+                     Out_File : Ada.Text_IO.File_Type;
+                  begin
+                     Ada.Text_IO.Create (Out_File,
+                        Ada.Text_IO.Out_File,
+                        To_String (Output_Path));
+                     Ada.Text_IO.Put_Line (Out_File, Sig_Hex);
+                     Ada.Text_IO.Close (Out_File);
+                  end;
+
+                  Put_Line ("Re-signed: " &
+                     To_String (Output_Path));
+                  if Verbose then
+                     Put_Line ("  New signature: " &
+                        Signature_To_Hex (Sig) (1 .. 32) & "...");
+                  end if;
+                  Set_Exit_Status (0);
+               end;
+            exception
+               when E : others =>
+                  Put_Line ("Error: " &
+                     Ada.Exceptions.Exception_Message (E));
+                  Set_Exit_Status (CT_Errors.Exit_General_Failure);
+            end;
+         end;
       end;
    end Run_Resign;
 

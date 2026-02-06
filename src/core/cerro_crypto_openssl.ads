@@ -43,6 +43,20 @@ package Cerro_Crypto_OpenSSL is
        Signature   : out Ed25519_Signature;
        Success     : out Boolean);
 
+   ----------------------------
+   -- Verification Operations --
+   ----------------------------
+
+   --  Verify an Ed25519 signature using OpenSSL
+   --  Valid indicates whether the signature matches the message and public key.
+   --  Success is False if the verification process itself failed (OpenSSL error).
+   procedure Verify_Ed25519
+      (Message    : String;
+       Signature  : Ed25519_Signature;
+       Public_Key : Ed25519_Public_Key;
+       Valid      : out Boolean;
+       Success    : out Boolean);
+
    -----------------------
    -- Key Serialization --
    -----------------------
